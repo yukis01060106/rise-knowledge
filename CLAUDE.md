@@ -1,5 +1,7 @@
 # CLAUDE.md — rise tech solutions 社内ナレッジ共有サイト
 
+@AGENTS.md
+
 このファイルは Claude Code（および人間の開発者）が守る前提・要件・規約をまとめたもの。
 方針を変えたら、このファイルも同じコミットで更新すること。
 
@@ -109,12 +111,24 @@ tests/                 # E2E（Playwright）
   状態遷移（正常系・異常系）は必ずテストを書く
 - LLM API と Slack はテストではモックにする。テストから外部 API を呼ばない
 
-## 6. よく使うコマンド（フェーズ1で整備）
+## 6. 開発環境とコマンド
 
 ```
-docker compose up -d        # db / minio を起動
+cp .env.example .env        # 値を埋める（開発では AUTH_DEV_LOGIN=true にすると SSO なしでログインできる）
+docker compose up -d db     # PostgreSQL（ローカルの PostgreSQL 16 でもよい）
+npm install                 # postinstall で prisma generate も走る
+npm run db:migrate          # マイグレーションの作成・適用（prisma migrate dev）
 npm run dev                 # 開発サーバー
-npm test                    # Vitest
-npm run test:e2e            # Playwright
-npx prisma migrate dev      # マイグレーション
+npm test                    # Vitest（.env.test の DB を使う。各テストの前に全テーブルを空にする）
+npm run typecheck           # 型チェック
+npm run lint                # ESLint
+npm run admin:grant -- <email>   # 最初の admin を登録（有効な admin が 1 人もいないときだけ動く）
 ```
+
+- `.env.test` には、名前に `test` を含むテスト用 DB を指定する（global-setup で確認している）
+- `prisma migrate reset` などの DB を消すコマンドは、AI エージェントからは実行しない
+  （Prisma 側でも止められる）。必要なときは人間に依頼する
+- 監査ログのトリガーなど、Prisma スキーマで表せない DB の定義はマイグレーション SQL に追記する
+- Next.js 16 では middleware ではなく `src/proxy.ts`。proxy はセッション Cookie の有無しか見ない
+- 認証：`src/server/auth/`。`getCurrentUser()` はロールを毎回 DB から読む。
+  Server Action のテストでは `tests/helpers/auth.ts` の `loginAs()` で `auth()` を差し替える

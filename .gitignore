@@ -12,3 +12,8 @@ test-results/
 
 .DS_Store
 *.log
+
+/src/generated/prisma
+*.tsbuildinfo
+next-env.d.ts
+.next-*

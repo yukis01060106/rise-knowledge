@@ -1,0 +1,110 @@
+// DB 設計は docs/design/database.md を参照。
+// テーブル名・カラム名は snake_case（@@map / @map）、Prisma 上は camelCase。
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Department {
+  dev
+  infra
+}
+
+enum Role {
+  member
+  admin
+}
+
+enum ActorType {
+  user
+  system
+}
+
+// 監査ログの操作種別。フェーズが進むごとに追加する（docs/design/database.md）
+enum AuditAction {
+  role_changed
+  user_disabled
+  user_enabled
+}
+
+model User {
+  id            String      @id @default(uuid()) @db.Uuid
+  email         String      @unique
+  name          String?
+  // Auth.js アダプタが書き込むため残している。画像はフェーズ1では保存しない
+  emailVerified DateTime?   @map("email_verified") @db.Timestamptz
+  image         String?
+  department    Department?
+  role          Role        @default(member)
+  disabledAt    DateTime?   @map("disabled_at") @db.Timestamptz
+  lastLoginAt   DateTime?   @map("last_login_at") @db.Timestamptz
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+
+  accounts          Account[]
+  sessions          Session[]
+  auditLogsAsActor  AuditLog[] @relation("AuditActor")
+  auditLogsAsTarget AuditLog[] @relation("AuditTargetUser")
+
+  @@map("users")
+}
+
+// Auth.js（@auth/prisma-adapter）が使うテーブル
+model Account {
+  userId            String  @map("user_id") @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  sessionToken String   @id @map("session_token")
+  userId       String   @map("user_id") @db.Uuid
+  expires      DateTime @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// 追記のみ。UPDATE / DELETE はトリガーで拒否する（マイグレーション参照）
+model AuditLog {
+  id           BigInt      @id @default(autoincrement())
+  actorId      String?     @map("actor_id") @db.Uuid
+  actorType    ActorType   @map("actor_type")
+  action       AuditAction
+  articleId    String?     @map("article_id") @db.Uuid
+  versionId    String?     @map("version_id") @db.Uuid
+  commentId    String?     @map("comment_id") @db.Uuid
+  targetUserId String?     @map("target_user_id") @db.Uuid
+  reason       String?
+  metadata     Json?
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  actor      User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  targetUser User? @relation("AuditTargetUser", fields: [targetUserId], references: [id], onDelete: Restrict)
+
+  @@index([articleId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
