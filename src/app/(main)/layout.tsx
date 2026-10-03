@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/server/auth/guards";
 import { countPendingReviews } from "@/server/articles/admin-queries";
+import { countFlaggedComments } from "@/server/social/queries";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { SideNav } from "@/components/layout/side-nav";
 import { UserMenu } from "@/components/layout/user-menu";
@@ -15,7 +16,7 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
   if (!user.department) redirect("/onboarding");
   const isAdmin = user.role === "admin";
-  const pendingReviews = isAdmin ? await countPendingReviews(user) : 0;
+  const [pendingReviews, flaggedComments] = isAdmin ? await Promise.all([countPendingReviews(user), countFlaggedComments(user)]) : [0, 0];
 
   return (
     <>
@@ -44,7 +45,7 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
             <UserMenu name={user.name} email={user.email} department={user.department} role={user.role} />
             {/* 右利きの人が多いため、メニューは右側に置く */}
             <Suspense>
-              <MobileNav isAdmin={isAdmin} pendingReviews={pendingReviews} />
+              <MobileNav isAdmin={isAdmin} pendingReviews={pendingReviews} flaggedComments={flaggedComments} />
             </Suspense>
           </div>
         </div>
@@ -54,7 +55,7 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
         <aside className="hidden lg:order-last lg:block">
           <div className="sticky top-16 py-8">
             <Suspense>
-              <SideNav isAdmin={isAdmin} pendingReviews={pendingReviews} />
+              <SideNav isAdmin={isAdmin} pendingReviews={pendingReviews} flaggedComments={flaggedComments} />
             </Suspense>
           </div>
         </aside>

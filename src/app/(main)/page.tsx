@@ -6,14 +6,17 @@ import { CategoryIcon } from "@/components/ui/category-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CATEGORIES } from "@/lib/taxonomy";
 import { PHILOSOPHY } from "@/lib/philosophy";
+import { followedTagFeed, weeklyTrending } from "@/server/social/queries";
 
 export default async function HomePage() {
   const user = await requireUser();
-  const [latest, tags, mine, byCategory] = await Promise.all([
+  const [latest, tags, mine, byCategory, trending, feed] = await Promise.all([
     listPublishedArticles({ pageSize: 7 }),
     listTags(16),
     listMyArticles(user, "draft"),
     countByCategory(),
+    weeklyTrending(5),
+    followedTagFeed(user, 4),
   ]);
   const [featured, ...rest] = latest.items;
   const firstName = (user.name ?? user.email).split(/\s+/).pop();
@@ -121,6 +124,21 @@ export default async function HomePage() {
       {/* 新着 */}
       <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_260px]">
         <section className="space-y-4">
+          {feed.items.length > 0 && (
+            <div className="mb-8 space-y-4">
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <h2 className="text-xl font-bold">フォロー中のタグの新着</h2>
+                <p className="flex flex-wrap gap-1 text-xs">
+                  {feed.tags.map((t) => (
+                    <Link key={t.id} href={`/tags/${encodeURIComponent(t.name)}`} className="rounded-full bg-brand-soft px-2 py-0.5 text-brand-strong">
+                      #{t.displayName}
+                    </Link>
+                  ))}
+                </p>
+              </div>
+              <ArticleCards articles={feed.items} columns={2} />
+            </div>
+          )}
           <div className="flex items-end justify-between">
             <h2 className="text-xl font-bold">新着記事</h2>
             <Link href="/articles" className="text-sm font-medium text-brand hover:underline">
@@ -138,6 +156,26 @@ export default async function HomePage() {
         </section>
 
         <aside className="space-y-6">
+          <section className="card p-5">
+            <h2 className="flex items-center gap-1.5 text-sm font-bold">
+              <span aria-hidden>🔥</span> 今週のトレンド
+            </h2>
+            {trending.length > 0 ? (
+              <ol className="mt-3 space-y-3">
+                {trending.map((a, i) => (
+                  <li key={a.id} className="flex gap-3">
+                    <span className="brand-text w-5 shrink-0 text-lg font-bold">{i + 1}</span>
+                    <Link href={`/articles/${a.id}`} className="min-w-0 text-sm leading-snug hover:text-brand">
+                      <span className="line-clamp-2 font-semibold">{a.title}</span>
+                      <span className="text-xs text-pink-600">♥ {a.likeCount}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="mt-2 text-xs text-muted">今週はまだいいねがありません。読んでよかった記事にいいねしましょう。</p>
+            )}
+          </section>
           <section className="card p-5">
             <h2 className="text-sm font-bold">自分の記事</h2>
             <dl className="mt-3 grid grid-cols-2 gap-2 text-center">

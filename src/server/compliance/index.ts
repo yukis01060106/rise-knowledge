@@ -141,3 +141,45 @@ export async function latestCheckFor(versionId: string) {
     select: { status: true, riskLevel: true, summary: true, findings: true, prescanFindings: true, model: true, errorCode: true, completedAt: true },
   });
 }
+
+export type CommentReviewResult =
+  | { kind: "ok"; riskLevel: "low"; checkId: string }
+  | { kind: "flag"; reason: "medium" | "failed"; summary: string | null; checkId: string }
+  | { kind: "block"; summary: string; suggestions: string[]; checkId: string };
+
+/**
+ * コメントの AI チェック（投稿の処理の中で実行する。短いので再試行は 2 回まで）。
+ * low：そのまま表示、medium：表示して管理者の確認待ち、high：投稿させない、失敗：安全のため管理者の確認待ち。
+ * commentId は投稿後に結び付ける（high のときも監査のため保存する）。
+ */
+export async function reviewComment(articleTitle: string, body: string): Promise<CommentReviewResult> {
+  const { reviewer, sleep } = deps();
+  const check = await prisma.complianceCheck.create({
+    data: { targetType: "comment", status: "pending", model: COMPLIANCE_CONFIG.model, promptVersion: COMPLIANCE_CONFIG.promptVersion },
+    select: { id: true },
+  });
+  const attempts = Math.min(2, COMPLIANCE_CONFIG.maxAttempts);
+  let lastError: ReviewerError | undefined;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const out = await reviewer.review({ title: `記事「${articleTitle}」へのコメント`, body });
+      await prisma.complianceCheck.update({
+        where: { id: check.id },
+        data: { status: "succeeded", attempts: attempt, model: out.model, riskLevel: out.riskLevel, summary: out.summary, findings: out.findings, completedAt: new Date() },
+      });
+      if (out.riskLevel === "high") {
+        return { kind: "block", summary: out.summary, suggestions: out.findings.map((f) => f.suggestion).slice(0, 3), checkId: check.id };
+      }
+      if (out.riskLevel === "medium") return { kind: "flag", reason: "medium", summary: out.summary, checkId: check.id };
+      return { kind: "ok", riskLevel: "low", checkId: check.id };
+    } catch (e) {
+      lastError = e instanceof ReviewerError ? e : new ReviewerError("api_error", true);
+      await prisma.complianceCheck.update({ where: { id: check.id }, data: { attempts: attempt, errorCode: lastError.code } });
+      if (!lastError.retryable || attempt === attempts) break;
+      await sleep(COMPLIANCE_CONFIG.retryBaseDelayMs);
+    }
+  }
+  await prisma.complianceCheck.update({ where: { id: check.id }, data: { status: "failed", completedAt: new Date() } });
+  console.warn(`[compliance] comment check=${check.id} failed error=${lastError?.code ?? "unknown"}`);
+  return { kind: "flag", reason: "failed", summary: null, checkId: check.id };
+}

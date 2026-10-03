@@ -9,6 +9,9 @@ import { TagChip } from "@/components/ui/tag-chip";
 import { CategoryBadge } from "@/components/ui/category-badge";
 import { describeFacets } from "@/lib/taxonomy";
 import { readingMinutes } from "@/lib/excerpt";
+import { getEngagement } from "@/server/social/queries";
+import { EngagementBar } from "@/components/social/engagement-bar";
+import { Comments } from "@/components/social/comments";
 import { buttonClass } from "@/components/ui/button";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { UNTITLED } from "@/lib/articles";
@@ -23,7 +26,11 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[id]"
   const shown = article.published ?? article.working;
   if (!shown) notFound();
   const isPreview = !article.published;
-  const html = await renderMarkdown(shown.bodyMd);
+  const [html, engagement] = await Promise.all([
+    renderMarkdown(shown.bodyMd),
+    // いいね・コメントは公開中で非公開化されていない記事だけ
+    article.published && !article.hidden ? getEngagement(user, article.id) : Promise.resolve(null),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -42,7 +49,13 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[id]"
             <Avatar name={article.author.name} department={article.author.department} />
             <div className="text-sm">
               <p className="font-semibold">
-                {article.author.name}
+                {article.author.profileId ? (
+                  <Link href={`/users/${article.author.profileId}`} className="hover:text-brand">
+                    {article.author.name}
+                  </Link>
+                ) : (
+                  article.author.name
+                )}
                 {article.isAuthor && article.author.isInitials && (
                   <span className="ml-2 rounded bg-background px-1.5 py-0.5 text-xs font-normal text-muted">イニシャルで表示中</span>
                 )}
@@ -83,7 +96,19 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[id]"
         </header>
         {/* renderMarkdown はサニタイズ済みの HTML だけを返す */}
         <div className="markdown-body" dangerouslySetInnerHTML={{ __html: html }} />
+        {engagement && (
+          <div className="mt-10 border-t border-border pt-6">
+            <EngagementBar
+              articleId={article.id}
+              likeCount={engagement.likeCount}
+              liked={engagement.liked}
+              stocked={engagement.stocked}
+              canLike={engagement.canLike}
+            />
+          </div>
+        )}
       </article>
+      {engagement && <Comments articleId={article.id} comments={engagement.comments} />}
     </div>
   );
 }

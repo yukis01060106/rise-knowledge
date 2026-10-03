@@ -6,6 +6,7 @@ import { writeAuditLog } from "@/server/audit/log";
 import { MAX_REASON_LENGTH } from "@/lib/articles";
 import { TRANSITIONS, type TransitionName } from "./transitions";
 import { blockingFindings, prescan, type PrescanFinding } from "@/server/compliance/prescan";
+import { notifyApproved, notifyRejected, notifyReviewRequested } from "@/server/notifications";
 
 /**
  * 記事のステートマシン。版の状態（status）と記事の公開状態はここだけで変更する
@@ -175,7 +176,7 @@ export type AiCheckOutcome =
  * すでに別の状態になっていたら（取り下げ・二重実行など）何もしない。
  */
 export async function applyAiCheckResult(versionId: string, outcome: AiCheckOutcome): Promise<{ applied: boolean }> {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx): Promise<{ applied: boolean; articleId?: string }> => {
     const version = await tx.articleVersion.findUnique({ where: { id: versionId }, select: { articleId: true, status: true } });
     if (!version) return { applied: false };
     await lockArticle(tx, version.articleId);
@@ -195,8 +196,13 @@ export async function applyAiCheckResult(versionId: string, outcome: AiCheckOutc
         metadata: outcome.metadata,
       });
     }
-    return { applied: true };
+    return { applied: true, articleId: version.articleId };
   });
+  if (result.applied && result.articleId) {
+    if (outcome.kind === "high") await notifyRejected(result.articleId, outcome.reason, true);
+    else await notifyReviewRequested(result.articleId, versionId);
+  }
+  return { applied: result.applied };
 }
 
 /** #9 承認して公開（admin_review → published）。著者本人は承認できない。旧公開版は superseded にする */
@@ -234,6 +240,9 @@ export function approveVersion(actor: Actor, versionId: string) {
         metadata: { versionNo: version.versionNo, previousVersionId: previous },
       });
       return { articleId: article.id };
+    }).then(async (r) => {
+      await notifyApproved(r.articleId);
+      return r;
     });
   });
 }
@@ -263,6 +272,9 @@ export function rejectVersion(actor: Actor, versionId: string, reasonInput: stri
         metadata: { versionNo: version.versionNo },
       });
       return { articleId: article.id };
+    }).then(async (r) => {
+      await notifyRejected(r.articleId, reason, false);
+      return r;
     });
   });
 }

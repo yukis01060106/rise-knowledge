@@ -44,10 +44,10 @@ describe("イニシャル投稿", () => {
     const reader = await createUser();
 
     const list = await listPublishedArticles();
-    expect(list.items[0].author).toEqual({ name: "J.T.", department: "dev", isInitials: true });
+    expect(list.items[0].author).toEqual({ name: "J.T.", department: "dev", isInitials: true, profileId: null });
     const search = await searchPublishedArticles("イニシャル");
     const detail = await getArticleDetail(reader, articleId);
-    expect(detail?.author).toEqual({ name: "J.T.", department: "dev", isInitials: true });
+    expect(detail?.author).toEqual({ name: "J.T.", department: "dev", isInitials: true, profileId: null });
 
     for (const data of [list, search, detail]) {
       const json = JSON.stringify(data);

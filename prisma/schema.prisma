@@ -61,6 +61,26 @@ enum RiskLevel {
   low
 }
 
+// コメントの状態（visible：表示中、flagged：表示中だが管理者の確認待ち、blocked：AI チェックで投稿を止めた、deleted：削除）
+enum CommentStatus {
+  visible
+  flagged
+  blocked
+  deleted
+}
+
+// 通知の種類
+enum NotificationType {
+  approved
+  rejected
+  auto_rejected
+  liked
+  commented
+  review_requested
+  comment_flagged
+  award
+}
+
 // 監査ログの操作種別。フェーズが進むごとに追加する（docs/design/database.md）
 enum AuditAction {
   version_created
@@ -74,6 +94,10 @@ enum AuditAction {
   rejected
   article_hidden
   article_unhidden
+  comment_blocked
+  comment_flagged
+  comment_approved
+  comment_deleted
   role_changed
   user_disabled
   user_enabled
@@ -102,6 +126,11 @@ model User {
   createdVersions   ArticleVersion[] @relation("VersionCreatedBy")
   decidedVersions   ArticleVersion[] @relation("VersionDecidedBy")
   images            Image[]
+  likes             Like[]
+  stocks            Stock[]
+  comments          Comment[]
+  tagFollows        TagFollow[]
+  notifications     Notification[]
   auditLogsAsActor  AuditLog[]       @relation("AuditActor")
   auditLogsAsTarget AuditLog[]       @relation("AuditTargetUser")
 
@@ -124,6 +153,9 @@ model Article {
   hiddenByUser     User?            @relation("ArticleHiddenBy", fields: [hiddenBy], references: [id], onDelete: Restrict)
   publishedVersion ArticleVersion?  @relation("PublishedVersion", fields: [publishedVersionId], references: [id], onDelete: Restrict)
   versions         ArticleVersion[] @relation("ArticleVersions")
+  likes            Like[]
+  stocks           Stock[]
+  comments         Comment[]
 
   @@index([authorId, updatedAt(sort: Desc)])
   @@map("articles")
@@ -177,6 +209,7 @@ model Tag {
   displayName String       @map("display_name")
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz
   versions    VersionTag[]
+  followers   TagFollow[]
 
   @@index([name(ops: raw("gin_bigm_ops"))], map: "tags_name_bigm_idx", type: Gin)
   @@map("tags")
@@ -215,10 +248,88 @@ model ComplianceCheck {
 
   // 下書きを破棄したら、その下書きの事前スキャンの記録も消す（審査に出した版はトリガーで削除できない）
   version ArticleVersion? @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  comment Comment?        @relation(fields: [commentId], references: [id], onDelete: Restrict)
 
   @@index([versionId, createdAt(sort: Desc)])
   @@index([commentId])
   @@map("compliance_checks")
+}
+
+// いいね（自分の記事にはできない）
+model Like {
+  userId    String   @map("user_id") @db.Uuid
+  articleId String   @map("article_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, articleId])
+  @@index([articleId, createdAt])
+  @@index([createdAt])
+  @@map("likes")
+}
+
+// ストック（あとで読む）
+model Stock {
+  userId    String   @map("user_id") @db.Uuid
+  articleId String   @map("article_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, articleId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("stocks")
+}
+
+// コメント。投稿前に事前スキャンと AI チェックを行う
+model Comment {
+  id        String        @id @default(uuid()) @db.Uuid
+  articleId String        @map("article_id") @db.Uuid
+  authorId  String        @map("author_id") @db.Uuid
+  bodyMd    String        @map("body_md")
+  status    CommentStatus @default(visible)
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  article          Article           @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  author           User              @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  complianceChecks ComplianceCheck[]
+
+  @@index([articleId, createdAt])
+  @@map("comments")
+}
+
+// タグのフォロー
+model TagFollow {
+  userId    String   @map("user_id") @db.Uuid
+  tagId     String   @map("tag_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([userId, tagId])
+  @@index([tagId])
+  @@map("tag_follows")
+}
+
+// サイト内通知。payload にはタイトル・理由など表示に必要なものだけを入れ、記事本文・コメント本文は入れない
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  articleId String?          @map("article_id") @db.Uuid
+  payload   Json
+  readAt    DateTime?        @map("read_at") @db.Timestamptz
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("notifications")
 }
 
 // アップロード画像。配信はアプリ経由（/api/images/[id]）でログインを確認する

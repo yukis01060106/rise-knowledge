@@ -24,10 +24,11 @@ const visiblePublished = {
   hiddenAt: null,
 } satisfies Prisma.ArticleWhereInput;
 
-const cardSelect = {
+export const cardSelect = {
   id: true,
   firstPublishedAt: true,
-  author: { select: { name: true, initials: true, department: true } },
+  author: { select: { id: true, name: true, initials: true, department: true } },
+  _count: { select: { likes: true, comments: { where: { status: { in: ["visible", "flagged"] } } } } },
   publishedVersion: {
     select: {
       title: true,
@@ -45,14 +46,20 @@ type CardRow = Prisma.ArticleGetPayload<{ select: typeof cardSelect }>;
 /**
  * 画面に出す著者。イニシャル表示の版では実名を含めない（ほかの人に返すデータに実名・ユーザー ID を載せない）
  */
-export type PublicAuthor = { name: string; department: Department | null; isInitials: boolean };
+export type PublicAuthor = {
+  name: string;
+  department: Department | null;
+  isInitials: boolean;
+  /** ユーザーページへのリンク用。イニシャル表示のときは null（実名にひもづけない） */
+  profileId: string | null;
+};
 
 export function toPublicAuthor(
-  author: { name: string | null; initials: string | null; department: Department | null },
+  author: { id: string; name: string | null; initials: string | null; department: Department | null },
   showInitials: boolean,
 ): PublicAuthor {
-  if (showInitials) return { name: author.initials ?? "イニシャル未設定", department: author.department, isInitials: true };
-  return { name: author.name ?? "名前未設定", department: author.department, isInitials: false };
+  if (showInitials) return { name: author.initials ?? "イニシャル未設定", department: author.department, isInitials: true, profileId: null };
+  return { name: author.name ?? "名前未設定", department: author.department, isInitials: false, profileId: author.id };
 }
 
 export type ArticleCard = {
@@ -62,12 +69,14 @@ export type ArticleCard = {
   readingMinutes: number;
   category: CategoryKey | null;
   facets: FacetLabel[];
+  likeCount: number;
+  commentCount: number;
   firstPublishedAt: Date | null;
   author: PublicAuthor;
   tags: { name: string; displayName: string }[];
 };
 
-function toCard(row: CardRow): ArticleCard {
+export function toCard(row: CardRow): ArticleCard {
   return {
     id: row.id,
     title: row.publishedVersion?.title ?? "",
@@ -75,6 +84,8 @@ function toCard(row: CardRow): ArticleCard {
     readingMinutes: readingMinutes(row.publishedVersion?.bodyMd ?? ""),
     category: row.publishedVersion?.category ?? null,
     facets: describeFacets(row.publishedVersion?.category, row.publishedVersion?.facets ?? []),
+    likeCount: row._count.likes,
+    commentCount: row._count.comments,
     firstPublishedAt: row.firstPublishedAt,
     author: toPublicAuthor(row.author, row.publishedVersion?.showInitials ?? false),
     tags: row.publishedVersion?.tags.map((t) => t.tag) ?? [],
@@ -235,7 +246,7 @@ async function loadArticle(id: string) {
       authorId: true,
       firstPublishedAt: true,
       hiddenAt: true,
-      author: { select: { name: true, initials: true, department: true } },
+      author: { select: { id: true, name: true, initials: true, department: true } },
       publishedVersion: { select: versionSelect },
       // 最新の版。作業中（draft / 審査中 / 差し戻し）かどうかは状態で判断する
       versions: { orderBy: { versionNo: "desc" }, select: versionSelect, take: 1 },

@@ -151,6 +151,10 @@ npm run worker              # ジョブのワーカー（AI チェック・Slack
 - 事業理念・ミッション・ビジョン・バリューの文言は `src/lib/philosophy.ts`。会社の資料のとおりに書き、言い換えない
   （句読点も含む。例：バリューは「！」で終わる）
 - 見た目の定義（色・カード・分類ごとの色・記事本文）は `src/app/design.css`。本物とデモの両方が読み込む
+- いいね・ストック・コメント・タグのフォローは `src/server/social/`。コメントも事前スキャンと AI チェックを通す
+  （high は投稿させない、medium と失敗は表示したまま管理者の確認待ち）。イニシャル表示の記事では著者本人のコメントも
+  イニシャルにし、ユーザーページ・いいねの合計にもイニシャル表示の記事を含めない
+- 通知は `src/server/notifications/`。失敗しても元の操作は失敗させない。payload・Slack に本文を入れない
 - 管理者向けの取得は `src/server/articles/admin-queries.ts`（ロールを関数の中でも確認する）
 - 記事の取得は `src/server/articles/queries.ts` を通す。Markdown の表示は `renderMarkdown()`
   （サニタイズ済みの `SanitizedHtml` を返す）だけを `dangerouslySetInnerHTML` に渡す

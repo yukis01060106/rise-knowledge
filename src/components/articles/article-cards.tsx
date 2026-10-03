@@ -11,8 +11,12 @@ function Meta({ a }: { a: ArticleCard }) {
       <Avatar name={a.author.name} department={a.author.department} size="sm" />
       <span className="font-medium text-foreground">{a.author.name}</span>
       <DepartmentBadge department={a.author.department} />
-      <span className="ml-auto shrink-0">
-        {formatDate(a.firstPublishedAt)} ・ {a.readingMinutes} 分
+      <span className="ml-auto flex shrink-0 items-center gap-2">
+        {a.likeCount > 0 && <span className="text-pink-600">♥ {a.likeCount}</span>}
+        {a.commentCount > 0 && <span>💬 {a.commentCount}</span>}
+        <span>
+          {formatDate(a.firstPublishedAt)} ・ {a.readingMinutes} 分
+        </span>
       </span>
     </div>
   );
