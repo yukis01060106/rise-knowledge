@@ -1,6 +1,40 @@
 # rise ナレッジ
 
 rise tech solutions 社内ナレッジ共有サイト（社内限定）。
+「離れていても、ひとつのチーム！」「学びを、仲間の武器にする！」を実現するための、Qiita のような記事共有サイトです。
+
+> このリポジトリはソースコードです。サイト本体は社内ネットワークでだけ動かします。
+> 下の画面は開発環境のもので、人名・記事はすべて架空のデータです。
+
+## 画面
+
+| トップ | ログイン | メニュー |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/mobile-top.jpg" width="240" alt="スマホのトップ画面"> | <img src="docs/screenshots/mobile-login.jpg" width="240" alt="スマホのログイン画面"> | <img src="docs/screenshots/mobile-menu.jpg" width="240" alt="スマホのメニュー"> |
+
+**トップ（PC）** — 新着記事、人気のタグ。メニューは右側
+
+![トップ画面](docs/screenshots/desktop-top.jpg)
+
+**記事** — Markdown、コードのハイライト、タグ
+
+![記事の画面](docs/screenshots/desktop-article.jpg)
+
+**記事を書く** — 左で入力、右でプレビュー。自動で下書き保存、画像の貼り付け、イニシャル表示での投稿
+
+![エディタ](docs/screenshots/desktop-editor.jpg)
+
+**承認フロー（管理者）** — 公開前にかならず管理者が確認。差し戻しの理由・版ごとの差分・審査の記録が残る
+
+![版の履歴](docs/screenshots/desktop-history.jpg)
+
+## 主な機能
+
+- 記事の投稿（Markdown・テンプレート・画像・タグ・自動保存）、一覧・タグ別・日本語全文検索
+- 承認フロー：下書き → AI チェック → 管理者の確認 → 公開。自分の記事は承認できない。AI が自動で公開することはない
+- 公開後に編集しても、新しい版が承認されるまでは公開中の内容を表示し続ける
+- イニシャル表示での投稿（ほかの社員には実名を出さない）
+- 監査ログ（追記のみ。変更・削除できない）、緊急非公開
 
 - 設計：[docs/design/](docs/design/)
 - 開発ルール・コマンド：[CLAUDE.md](CLAUDE.md)
