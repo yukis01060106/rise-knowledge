@@ -12,6 +12,8 @@ import { readingMinutes } from "@/lib/excerpt";
 import { getEngagement } from "@/server/social/queries";
 import { EngagementBar } from "@/components/social/engagement-bar";
 import { Comments } from "@/components/social/comments";
+import { awardMonthsFor } from "@/server/insights/queries";
+import { AwardBadge } from "@/components/articles/article-cards";
 import { buttonClass } from "@/components/ui/button";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { UNTITLED } from "@/lib/articles";
@@ -26,10 +28,11 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[id]"
   const shown = article.published ?? article.working;
   if (!shown) notFound();
   const isPreview = !article.published;
-  const [html, engagement] = await Promise.all([
+  const [html, engagement, awards] = await Promise.all([
     renderMarkdown(shown.bodyMd),
     // いいね・コメントは公開中で非公開化されていない記事だけ
     article.published && !article.hidden ? getEngagement(user, article.id) : Promise.resolve(null),
+    awardMonthsFor(article.id),
   ]);
 
   return (
@@ -74,6 +77,9 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[id]"
           </div>
           <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-muted">
             <CategoryBadge category={shown.category} />
+            {awards.map((m) => (
+              <AwardBadge key={m} month={m} />
+            ))}
             <span>読了 {readingMinutes(shown.bodyMd)} 分</span>
           </div>
           <h1 className="mt-3 text-2xl leading-snug font-bold tracking-tight sm:text-4xl">{shown.title || UNTITLED}</h1>

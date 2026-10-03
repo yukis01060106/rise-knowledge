@@ -54,4 +54,5 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   role_changed: "ロール変更",
   user_disabled: "ユーザー無効化",
   user_enabled: "ユーザー有効化",
+  award_given: "月間ベストを表彰",
 };

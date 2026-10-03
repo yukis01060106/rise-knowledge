@@ -7,6 +7,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { CATEGORIES } from "@/lib/taxonomy";
 import { PHILOSOPHY } from "@/lib/philosophy";
 import { followedTagFeed, weeklyTrending } from "@/server/social/queries";
+import { latestAward } from "@/server/insights/queries";
+import { monthLabel } from "@/lib/month";
 
 export default async function HomePage() {
   const user = await requireUser();
@@ -18,6 +20,7 @@ export default async function HomePage() {
     weeklyTrending(5),
     followedTagFeed(user, 4),
   ]);
+  const award = await latestAward();
   const [featured, ...rest] = latest.items;
   const firstName = (user.name ?? user.email).split(/\s+/).pop();
 
@@ -69,6 +72,22 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* 月間ベスト */}
+      {award && (
+        <Link
+          href={`/articles/${award.card.id}`}
+          className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-amber-300 via-amber-400 to-orange-500 p-6 text-amber-950 shadow-lg sm:p-8"
+        >
+          <span aria-hidden className="orbit -top-20 -right-20 size-72 border-white/40" />
+          <p className="relative text-sm font-bold">🏆 {monthLabel(award.month)}のベスト記事</p>
+          <p className="relative mt-2 text-2xl leading-snug font-bold group-hover:underline sm:text-3xl">{award.card.title}</p>
+          <p className="relative mt-2 text-sm">
+            {award.card.author.name}
+            {award.comment && <span className="ml-2 opacity-80">「{award.comment}」</span>}
+          </p>
+        </Link>
+      )}
 
       {/* バリュー */}
       <section className="card relative overflow-hidden p-5 sm:p-6">

@@ -101,6 +101,7 @@ enum AuditAction {
   role_changed
   user_disabled
   user_enabled
+  award_given
 }
 
 model User {
@@ -131,6 +132,7 @@ model User {
   comments          Comment[]
   tagFollows        TagFollow[]
   notifications     Notification[]
+  awardsGiven       MonthlyAward[]
   auditLogsAsActor  AuditLog[]       @relation("AuditActor")
   auditLogsAsTarget AuditLog[]       @relation("AuditTargetUser")
 
@@ -156,6 +158,7 @@ model Article {
   likes            Like[]
   stocks           Stock[]
   comments         Comment[]
+  awards           MonthlyAward[]
 
   @@index([authorId, updatedAt(sort: Desc)])
   @@map("articles")
@@ -330,6 +333,22 @@ model Notification {
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("notifications")
+}
+
+// 月間ベスト表彰（1 か月に 1 本）。month はその月の 1 日
+model MonthlyAward {
+  id        String   @id @default(uuid()) @db.Uuid
+  month     DateTime @unique @db.Date
+  articleId String   @map("article_id") @db.Uuid
+  awardedBy String   @map("awarded_by") @db.Uuid
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  awarder User    @relation(fields: [awardedBy], references: [id], onDelete: Restrict)
+
+  @@index([articleId])
+  @@map("monthly_awards")
 }
 
 // アップロード画像。配信はアプリ経由（/api/images/[id]）でログインを確認する

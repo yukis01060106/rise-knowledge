@@ -155,6 +155,9 @@ npm run worker              # ジョブのワーカー（AI チェック・Slack
   （high は投稿させない、medium と失敗は表示したまま管理者の確認待ち）。イニシャル表示の記事では著者本人のコメントも
   イニシャルにし、ユーザーページ・いいねの合計にもイニシャル表示の記事を含めない
 - 通知は `src/server/notifications/`。失敗しても元の操作は失敗させない。payload・Slack に本文を入れない
+- ランキング・表彰・ダッシュボード・通知の一覧は `src/server/insights/`。月は日本時間（`src/lib/month.ts`）。
+  投稿者ランキングにイニシャル表示の記事は数えない
+- グラフの色は検証済みの組み合わせを使う（開発部 #0068b7・インフラ部 #e2733a）。凡例・数値ラベル・表で見る を付ける
 - 管理者向けの取得は `src/server/articles/admin-queries.ts`（ロールを関数の中でも確認する）
 - 記事の取得は `src/server/articles/queries.ts` を通す。Markdown の表示は `renderMarkdown()`
   （サニタイズ済みの `SanitizedHtml` を返す）だけを `dangerouslySetInnerHTML` に渡す

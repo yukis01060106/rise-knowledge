@@ -4,6 +4,16 @@ import { Avatar } from "@/components/ui/avatar";
 import { CategoryBadge } from "@/components/ui/category-badge";
 import { DepartmentBadge } from "@/components/ui/department-badge";
 import { formatDate } from "@/lib/format";
+import { monthLabel } from "@/lib/month";
+
+export function AwardBadge({ month }: { month: string | null }) {
+  if (!month) return null;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-2 py-0.5 text-xs font-bold text-white shadow-sm">
+      🏆 {monthLabel(month)}のベスト
+    </span>
+  );
+}
 
 function Meta({ a }: { a: ArticleCard }) {
   return (
@@ -49,8 +59,9 @@ export function ArticleCards({ articles, columns = 1 }: { articles: ArticleCard[
       {articles.map((a) => (
         <li key={a.id}>
           <Link href={`/articles/${a.id}`} className="card group flex h-full flex-col gap-3 overflow-hidden p-5">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <CategoryBadge category={a.category} />
+              <AwardBadge month={a.awardMonth} />
             </div>
             <h3 className="text-lg leading-snug font-bold group-hover:text-brand">{a.title}</h3>
             {a.excerpt && <p className="line-clamp-2 text-sm leading-relaxed text-muted">{a.excerpt}</p>}
@@ -77,6 +88,7 @@ export function FeaturedArticle({ a }: { a: ArticleCard }) {
       <div className="flex items-center gap-2">
         <span className="rounded-full bg-foreground px-2.5 py-0.5 text-xs font-bold text-white">NEW</span>
         <CategoryBadge category={a.category} />
+        <AwardBadge month={a.awardMonth} />
       </div>
       <h3 className="text-2xl leading-snug font-bold group-hover:text-brand sm:text-3xl">{a.title}</h3>
       {a.excerpt && <p className="line-clamp-3 leading-relaxed text-muted">{a.excerpt}</p>}

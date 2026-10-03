@@ -29,6 +29,8 @@ const ICONS = {
   stock: icon("M6 3h12v18l-6-4-6 4z"),
   bell: icon("M18 16v-5a6 6 0 1 0-12 0v5l-2 2h16zM10 20a2 2 0 0 0 4 0"),
   comment: icon("M4 5h16v11H8l-4 4z"),
+  rank: icon("M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM17 6h3v2a3 3 0 0 1-3 3M7 6H4v2a3 3 0 0 0 3 3"),
+  chart: icon("M4 20V10M10 20V4M16 20v-7M22 20H2"),
   about: icon("M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"),
   users: icon("M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1M9 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM22 19v-1a4 4 0 0 0-3-3.9M16 4.1a3 3 0 0 1 0 5.8"),
 };
@@ -46,6 +48,7 @@ function sections(isAdmin: boolean, pendingReviews: number, flaggedComments: num
         },
         { href: "/tags", label: "タグ", icon: ICONS.tags, match: (p) => p.startsWith("/tags") },
         { href: "/search", label: "検索", icon: ICONS.search, match: (p) => p.startsWith("/search") },
+        { href: "/rankings", label: "ランキング", icon: ICONS.rank, match: (p) => p.startsWith("/rankings") },
         { href: "/about", label: "理念・バリュー", icon: ICONS.about, match: (p) => p.startsWith("/about") },
       ],
     },
@@ -68,6 +71,7 @@ function sections(isAdmin: boolean, pendingReviews: number, flaggedComments: num
         { href: "/articles/new", label: "記事を書く", icon: ICONS.write, match: (p) => p === "/articles/new" || p.endsWith("/edit") },
         { href: "/me/articles", label: "自分の記事", icon: ICONS.mine, match: (p) => p.startsWith("/me/articles") },
         { href: "/me/stocks", label: "ストック", icon: ICONS.stock, match: (p) => p.startsWith("/me/stocks") },
+        { href: "/notifications", label: "通知", icon: ICONS.bell, match: (p) => p.startsWith("/notifications") },
         { href: "/me/settings", label: "設定", icon: ICONS.settings, match: (p) => p.startsWith("/me/settings") },
       ],
     },
@@ -76,6 +80,7 @@ function sections(isAdmin: boolean, pendingReviews: number, flaggedComments: num
     list.push({
       title: "管理",
       items: [
+        { href: "/admin", label: "ダッシュボード", icon: ICONS.chart, match: (p) => p === "/admin" },
         { href: "/admin/reviews", label: "レビュー待ち", icon: ICONS.review, match: (p) => p.startsWith("/admin/reviews"), badge: pendingReviews },
         { href: "/admin/articles", label: "記事管理", icon: ICONS.manage, match: (p) => p.startsWith("/admin/articles") },
         {
@@ -85,6 +90,7 @@ function sections(isAdmin: boolean, pendingReviews: number, flaggedComments: num
           match: (p) => p.startsWith("/admin/comments"),
           badge: flaggedComments,
         },
+        { href: "/admin/awards", label: "月間ベスト", icon: ICONS.rank, match: (p) => p.startsWith("/admin/awards") },
         { href: "/admin/audit-logs", label: "監査ログ", icon: ICONS.audit, match: (p) => p.startsWith("/admin/audit-logs") },
         { href: "/admin/users", label: "ユーザー管理", icon: ICONS.users, match: (p) => p.startsWith("/admin/users") },
       ],

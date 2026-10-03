@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/server/auth/guards";
 import { countPendingReviews } from "@/server/articles/admin-queries";
 import { countFlaggedComments } from "@/server/social/queries";
+import { unreadNotificationCount } from "@/server/insights/queries";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { SideNav } from "@/components/layout/side-nav";
 import { UserMenu } from "@/components/layout/user-menu";
@@ -16,6 +17,7 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
   if (!user.department) redirect("/onboarding");
   const isAdmin = user.role === "admin";
+  const unread = await unreadNotificationCount(user);
   const [pendingReviews, flaggedComments] = isAdmin ? await Promise.all([countPendingReviews(user), countFlaggedComments(user)]) : [0, 0];
 
   return (
@@ -39,6 +41,16 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
             />
           </form>
           <div className="ml-auto flex items-center gap-2 md:ml-0">
+            <Link href="/notifications" aria-label={`通知${unread > 0 ? `（未読 ${unread} 件）` : ""}`} className="relative rounded-full p-2 text-muted hover:bg-background hover:text-foreground">
+              <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="size-5">
+                <path d="M18 16v-5a6 6 0 1 0-12 0v5l-2 2h16zM10 20a2 2 0 0 0 4 0" />
+              </svg>
+              {unread > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-accent px-1 text-center text-[10px] leading-4 font-bold text-white">
+                  {unread > 99 ? "99+" : unread}
+                </span>
+              )}
+            </Link>
             <Link href="/articles/new" className={buttonClass("primary", "sm", "brand-gradient rounded-full px-3.5 shadow-sm")}>
               記事を書く
             </Link>

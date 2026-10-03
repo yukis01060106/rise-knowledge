@@ -6,6 +6,7 @@ import { normalizeTagName } from "@/lib/tags";
 import { isWorkingStatus } from "@/lib/labels";
 import { CATEGORY_KEYS, describeFacets, groupFilter, type CategoryKey, type FacetLabel } from "@/lib/taxonomy";
 import { excerptOf, readingMinutes } from "@/lib/excerpt";
+import { monthOf } from "@/lib/month";
 
 /**
  * 記事の取得はかならずこのモジュールを通す（誰が・どの版を見てよいかをここで判定する）。
@@ -29,6 +30,7 @@ export const cardSelect = {
   firstPublishedAt: true,
   author: { select: { id: true, name: true, initials: true, department: true } },
   _count: { select: { likes: true, comments: { where: { status: { in: ["visible", "flagged"] } } } } },
+  awards: { select: { month: true }, orderBy: { month: "desc" }, take: 1 },
   publishedVersion: {
     select: {
       title: true,
@@ -71,6 +73,8 @@ export type ArticleCard = {
   facets: FacetLabel[];
   likeCount: number;
   commentCount: number;
+  /** 月間ベストに選ばれた月（いちばん新しいもの） */
+  awardMonth: string | null;
   firstPublishedAt: Date | null;
   author: PublicAuthor;
   tags: { name: string; displayName: string }[];
@@ -85,6 +89,7 @@ export function toCard(row: CardRow): ArticleCard {
     category: row.publishedVersion?.category ?? null,
     facets: describeFacets(row.publishedVersion?.category, row.publishedVersion?.facets ?? []),
     likeCount: row._count.likes,
+    awardMonth: row.awards[0] ? monthOf(new Date(row.awards[0].month.getTime() + 9 * 3600_000)) : null,
     commentCount: row._count.comments,
     firstPublishedAt: row.firstPublishedAt,
     author: toPublicAuthor(row.author, row.publishedVersion?.showInitials ?? false),
