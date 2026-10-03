@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/server/auth/guards";
@@ -20,9 +21,7 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
       <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5">
           <Link href="/" className="flex items-center gap-2 font-bold text-brand-strong">
-            <span aria-hidden className="inline-flex size-7 items-center justify-center rounded-md bg-brand text-sm text-white">
-              r
-            </span>
+            <Image src="/brand/logo.png" alt="" width={30} height={28} priority />
             <span className="hidden sm:inline">rise ナレッジ</span>
           </Link>
           <form action="/search" role="search" className="ml-auto hidden w-72 md:block">

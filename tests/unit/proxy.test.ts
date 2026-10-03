@@ -21,8 +21,12 @@ describe("proxy（未ログイン時のリダイレクト）", () => {
     expect(proxy(request("/api/articles")).status).toBe(401);
   });
 
-  it.each(["/login", "/api/auth/signin", "/api/auth/callback/google"])("%s はログインなしで通す", (path) => {
+  it.each(["/login", "/api/auth/signin", "/api/auth/callback/google", "/brand/logo.png", "/icon.png"])("%s はログインなしで通す", (path) => {
     expect(proxy(request(path)).headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it("/brand に似た名前のパスは公開しない", () => {
+    expect(proxy(request("/brandnew")).status).toBe(307);
   });
 
   it("セッション Cookie があれば通す（中身の検証はサーバー側で行う）", () => {

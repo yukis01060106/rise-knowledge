@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/auth/guards";
 import { loginAction } from "@/server/auth/actions";
@@ -19,9 +20,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
     <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-6 px-4 py-16">
       <div className="text-center">
-        <span aria-hidden className="mx-auto mb-3 inline-flex size-12 items-center justify-center rounded-xl bg-brand text-2xl font-bold text-white">
-          r
-        </span>
+        <Image src="/brand/logo.png" alt="rise tech solutions" width={68} height={64} priority className="mx-auto mb-3" />
         <h1 className="text-2xl font-bold text-brand-strong">rise ナレッジ</h1>
         <p className="mt-2 text-sm text-muted">離れていても、ひとつのチーム！</p>
       </div>

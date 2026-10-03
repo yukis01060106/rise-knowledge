@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-/** ログインなしで開けるパス（それ以外はすべてログイン必須） */
-const PUBLIC_PATHS = ["/login", "/api/auth", "/api/dev-login"];
+/** ログインなしで開けるパス（それ以外はすべてログイン必須）。ロゴとアイコンはログイン画面で使う */
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/dev-login", "/brand", "/icon.png", "/apple-icon.png"];
 
 export const SESSION_COOKIE_NAMES = ["authjs.session-token", "__Secure-authjs.session-token"];
 
