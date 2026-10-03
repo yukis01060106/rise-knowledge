@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAdmin, requireUser } from "@/server/auth/guards";
 import { runComplianceCheck } from "@/server/compliance";
+import { describePrescan } from "@/server/compliance/prescan";
 import {
   approveVersion,
   discardDraft,
@@ -14,7 +15,7 @@ import {
   unhideArticle,
 } from "@/server/workflow";
 
-export type WorkflowActionState = { ok: boolean; message: string } | null;
+export type WorkflowActionState = { ok: boolean; message: string; details?: string[] } | null;
 
 const id = z.uuid();
 
@@ -23,7 +24,9 @@ export async function submitReviewAction(articleId: string): Promise<WorkflowAct
   const user = await requireUser();
   if (!id.safeParse(articleId).success) return { ok: false, message: "記事が見つかりません" };
   const result = await submitForReview(user, articleId);
-  if (!result.ok) return { ok: false, message: result.message };
+  if (!result.ok) {
+    return { ok: false, message: result.message, details: "findings" in result ? result.findings.map(describePrescan) : undefined };
+  }
 
   await runComplianceCheck(result.versionId);
   revalidatePath("/me/articles");

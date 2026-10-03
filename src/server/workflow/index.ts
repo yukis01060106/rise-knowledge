@@ -5,6 +5,7 @@ import { prisma, type Tx } from "@/server/db";
 import { writeAuditLog } from "@/server/audit/log";
 import { MAX_REASON_LENGTH } from "@/lib/articles";
 import { TRANSITIONS, type TransitionName } from "./transitions";
+import { blockingFindings, prescan, type PrescanFinding } from "@/server/compliance/prescan";
 
 /**
  * 記事のステートマシン。版の状態（status）と記事の公開状態はここだけで変更する
@@ -94,11 +95,18 @@ function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 }
 
-/** #5 レビュー申請（draft → ai_review）。著者だけ。タイトルと本文が空でないこと */
-export function submitForReview(actor: Actor, articleId: string) {
-  return run(async () => {
-    if (!isUuid(articleId)) throw NOT_FOUND();
-    return prisma.$transaction(async (tx) => {
+/**
+ * #5 レビュー申請（draft → ai_review）。著者だけ。タイトルと本文が空でないこと。
+ * #5' 事前スキャンで止めるべき文字列（秘密鍵・API キーなど）があれば申請しない。止めたことは監査ログに残す。
+ */
+export async function submitForReview(
+  actor: Actor,
+  articleId: string,
+): Promise<WorkflowResult<{ versionId: string }> | { ok: false; code: "prescan_blocked"; message: string; findings: PrescanFinding[] }> {
+  if (!isUuid(articleId)) return { ok: false, code: "not_found", message: "記事が見つかりません" };
+  try {
+    type TxResult = { kind: "blocked"; blocked: PrescanFinding[] } | { kind: "submitted"; versionId: string };
+    const result = await prisma.$transaction(async (tx): Promise<TxResult> => {
       const article = await lockArticle(tx, articleId);
       if (!article || article.author_id !== actor.id) throw NOT_FOUND();
       const version = await latestVersion(tx, articleId);
@@ -113,6 +121,22 @@ export function submitForReview(actor: Actor, articleId: string) {
         if (!author.initials) throw new WorkflowError("invalid", "イニシャル表示にするには、先に設定画面でイニシャルを登録してください");
       }
 
+      const blocked = blockingFindings(prescan(version.title, version.bodyMd));
+      if (blocked.length > 0) {
+        // 値そのものは残さない（何行目に・どの種類か だけ）
+        await tx.complianceCheck.create({
+          data: { targetType: "article_version", versionId: version.id, status: "blocked_by_prescan", prescanFindings: blocked, completedAt: new Date() },
+        });
+        await writeAuditLog(tx, {
+          actorId: actor.id,
+          action: "prescan_blocked",
+          articleId,
+          versionId: version.id,
+          metadata: { versionNo: version.versionNo, findings: blocked },
+        });
+        return { kind: "blocked", blocked };
+      }
+
       await move(tx, version.id, "submit", { submittedAt: new Date() });
       await writeAuditLog(tx, {
         actorId: actor.id,
@@ -121,9 +145,21 @@ export function submitForReview(actor: Actor, articleId: string) {
         versionId: version.id,
         metadata: { versionNo: version.versionNo },
       });
-      return { versionId: version.id };
+      return { kind: "submitted", versionId: version.id };
     });
-  });
+    if (result.kind === "blocked") {
+      return {
+        ok: false,
+        code: "prescan_blocked",
+        message: "公開できない情報（パスワード・API キー・秘密鍵など）が含まれているため、申請できません。該当箇所を削除してください",
+        findings: result.blocked,
+      };
+    }
+    return { ok: true, versionId: result.versionId };
+  } catch (e) {
+    if (e instanceof WorkflowError) return { ok: false, code: e.code, message: e.message };
+    throw e;
+  }
 }
 
 export type AiCheckOutcome =

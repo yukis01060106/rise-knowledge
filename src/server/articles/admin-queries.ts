@@ -28,6 +28,8 @@ export type PendingReview = {
   aiCheckFailed: boolean;
   showInitials: boolean;
   category: "dev" | "infra" | "career" | null;
+  /** AI チェックのリスク（未実施なら null） */
+  riskLevel: "high" | "medium" | "low" | null;
   /** 公開済みの記事の更新か（初回公開でなければ true） */
   isUpdate: boolean;
   author: { id: string; name: string | null; department: "dev" | "infra" | null };
@@ -49,6 +51,12 @@ export async function listPendingReviews(viewer: AdminViewer): Promise<PendingRe
       aiCheckFailed: true,
       showInitials: true,
       category: true,
+      complianceChecks: {
+        where: { status: "succeeded" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { riskLevel: true },
+      },
       article: {
         select: { publishedVersionId: true, author: { select: { id: true, name: true, department: true } } },
       },
@@ -63,6 +71,7 @@ export async function listPendingReviews(viewer: AdminViewer): Promise<PendingRe
     aiCheckFailed: r.aiCheckFailed,
     showInitials: r.showInitials,
     category: r.category,
+    riskLevel: r.complianceChecks[0]?.riskLevel ?? null,
     isUpdate: r.article.publishedVersionId !== null,
     author: r.article.author,
   }));

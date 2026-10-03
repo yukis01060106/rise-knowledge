@@ -128,6 +128,7 @@ npm run typecheck           # 型チェック
 npm run lint                # ESLint
 npm run admin:grant -- <email>   # 最初の admin を登録（有効な admin が 1 人もいないときだけ動く）
 npm run db:seed:dev         # 動作確認用の架空ユーザーと公開記事を作る（名前に dev を含む DB だけ）
+npm run worker              # ジョブのワーカー（AI チェック・Slack 通知）。COMPLIANCE_RUNNER=queue のとき必要
 ```
 
 - `.env.test` には、名前に `test` を含むテスト用 DB を指定する（global-setup で確認している）
@@ -159,5 +160,7 @@ npm run db:seed:dev         # 動作確認用の架空ユーザーと公開記�
   コード・データには一切つながない。クラスを変えたら `npm run demo:build` で `demo/styles.css` を書き出してコミットする。
   公開は `npm run demo:publish`（`demo/` を `gh-pages` ブランチに push し、GitHub Pages がそれを配信する）。
   画面の色（`src/app/globals.css` の `:root`）を変えたら `demo/styles.src.css` もそろえる
+- AI チェック：`src/server/compliance/`（事前スキャン・Claude API・再試行）。テストでは `setComplianceDepsForTests`
+  で LLM を偽物に差し替える（tests/helpers/setup.ts で既定は「問題なし」）。ログに本文・プロンプト・応答を出さない
 - 認証：`src/server/auth/`。`getCurrentUser()` はロールを毎回 DB から読む。
   Server Action のテストでは `tests/helpers/auth.ts` の `loginAs()` で `auth()` を差し替える

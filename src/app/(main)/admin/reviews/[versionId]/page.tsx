@@ -12,13 +12,15 @@ import { describeFacets } from "@/lib/taxonomy";
 import { formatDateTime } from "@/lib/format";
 import { VERSION_STATUS_LABELS } from "@/lib/labels";
 import { ReviewActions } from "./review-actions";
+import { CompliancePanel } from "@/components/articles/compliance-panel";
+import { latestCheckFor } from "@/server/compliance";
 
 export default async function ReviewPage({ params }: PageProps<"/admin/reviews/[versionId]">) {
   const admin = await requireAdmin();
   const review = await getVersionForReview(admin, (await params).versionId);
   if (!review) notFound();
   const { version, article, compareTo, previousRejected, isSelf } = review;
-  const html = await renderMarkdown(version.bodyMd);
+  const [html, check] = await Promise.all([renderMarkdown(version.bodyMd), latestCheckFor(version.id)]);
   const reviewable = version.status === "admin_review";
 
   return (
@@ -54,7 +56,9 @@ export default async function ReviewPage({ params }: PageProps<"/admin/reviews/[
           </div>
         </div>
 
-        {version.aiCheckFailed && (
+        <CompliancePanel check={check} bodyMd={version.bodyMd} title={version.title} />
+
+        {version.aiCheckFailed && !check && (
           <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <strong>AI チェック未実施：</strong>AI チェックに失敗したため、AI の判定がありません。機密情報が含まれていないか、特に注意して確認してください。
           </p>

@@ -42,11 +42,31 @@ enum ArticleCategory {
   career
 }
 
+// AI チェック（docs/design/database.md の compliance_checks）
+enum ComplianceTarget {
+  article_version
+  comment
+}
+
+enum ComplianceStatus {
+  pending
+  blocked_by_prescan
+  succeeded
+  failed
+}
+
+enum RiskLevel {
+  high
+  medium
+  low
+}
+
 // 監査ログの操作種別。フェーズが進むごとに追加する（docs/design/database.md）
 enum AuditAction {
   version_created
   draft_discarded
   submitted
+  prescan_blocked
   ai_check_completed
   ai_check_failed
   auto_rejected
@@ -132,13 +152,14 @@ model ArticleVersion {
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
-  article         Article          @relation("ArticleVersions", fields: [articleId], references: [id], onDelete: Restrict)
-  publishedOf     Article?         @relation("PublishedVersion")
-  basedOn         ArticleVersion?  @relation("VersionBasedOn", fields: [basedOnVersionId], references: [id], onDelete: Restrict)
-  derivedVersions ArticleVersion[] @relation("VersionBasedOn")
-  creator         User             @relation("VersionCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
-  decider         User?            @relation("VersionDecidedBy", fields: [decidedBy], references: [id], onDelete: Restrict)
-  tags            VersionTag[]
+  article          Article           @relation("ArticleVersions", fields: [articleId], references: [id], onDelete: Restrict)
+  publishedOf      Article?          @relation("PublishedVersion")
+  basedOn          ArticleVersion?   @relation("VersionBasedOn", fields: [basedOnVersionId], references: [id], onDelete: Restrict)
+  derivedVersions  ArticleVersion[]  @relation("VersionBasedOn")
+  creator          User              @relation("VersionCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  decider          User?             @relation("VersionDecidedBy", fields: [decidedBy], references: [id], onDelete: Restrict)
+  tags             VersionTag[]
+  complianceChecks ComplianceCheck[]
 
   // 部分インデックス（作業中の版は 1 記事 1 つ、レビュー待ち）と全文検索の lower() 式インデックスは
   // マイグレーション SQL で作る（Prisma は式インデックスを無視するので消されない）
@@ -171,6 +192,33 @@ model VersionTag {
   @@id([versionId, tagId])
   @@index([tagId, versionId])
   @@map("version_tags")
+}
+
+// AI チェックの結果。再試行の途中経過で更新されるため、確定値は監査ログの metadata を正とする
+model ComplianceCheck {
+  id              String           @id @default(uuid()) @db.Uuid
+  targetType      ComplianceTarget @map("target_type")
+  versionId       String?          @map("version_id") @db.Uuid
+  commentId       String?          @map("comment_id") @db.Uuid
+  status          ComplianceStatus @default(pending)
+  // 事前スキャンの結果。何行目に・どの種類の文字列があったかだけを保存し、値そのものは保存しない
+  prescanFindings Json?            @map("prescan_findings")
+  model           String?
+  promptVersion   String?          @map("prompt_version")
+  riskLevel       RiskLevel?       @map("risk_level")
+  summary         String?
+  findings        Json?
+  attempts        Int              @default(0)
+  errorCode       String?          @map("error_code")
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  completedAt     DateTime?        @map("completed_at") @db.Timestamptz
+
+  // 下書きを破棄したら、その下書きの事前スキャンの記録も消す（審査に出した版はトリガーで削除できない）
+  version ArticleVersion? @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([versionId, createdAt(sort: Desc)])
+  @@index([commentId])
+  @@map("compliance_checks")
 }
 
 // アップロード画像。配信はアプリ経由（/api/images/[id]）でログインを確認する

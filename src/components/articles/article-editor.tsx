@@ -54,6 +54,7 @@ export function ArticleEditor(props: Props) {
   const [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
   const [uploading, setUploading] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  const [noticeDetails, setNoticeDetails] = useState<string[]>([]);
   const [hasDraft, setHasDraft] = useState(props.initialUpdatedAt !== null);
   const [busy, setBusy] = useState<"submit" | "discard" | null>(null);
   const router = useRouter();
@@ -153,8 +154,10 @@ export function ArticleEditor(props: Props) {
       const result = await submitReviewAction(articleIdRef.current);
       if (!result?.ok) {
         setNotice(result?.message ?? "レビューを申請できませんでした");
+        setNoticeDetails(result?.details ?? []);
         return;
       }
+      setNoticeDetails([]);
       blockedRef.current = true;
       router.push("/me/articles?tab=review");
     } finally {
@@ -534,9 +537,16 @@ export function ArticleEditor(props: Props) {
       </div>
 
       {notice && (
-        <p role="alert" className="text-sm text-danger">
-          {notice}
-        </p>
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <p>{notice}</p>
+          {noticeDetails.length > 0 && (
+            <ul className="mt-2 list-disc pl-5">
+              {noticeDetails.map((d) => (
+                <li key={d}>{d}</li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-3 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur">

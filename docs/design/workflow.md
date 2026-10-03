@@ -65,7 +65,12 @@ stateDiagram-v2
   の Server Action を呼ぶ
 - 差し戻された版（rejected）は終わりの状態。著者が修正すると新しい draft 版を作り（比較元は差し戻された版）、
   レビュー画面では「前回差し戻した版からの修正」として差分を表示する
-- フェーズ 3 の AI チェックは仮実装（`runComplianceCheck` が判定なしで admin_review へ進める）
+- AI チェック（`src/server/compliance/`）：申請時に事前スキャン（`prescan.ts`）で秘密鍵・API キー・本物らしい
+  パスワードなどがあれば申請を止める。通過したらジョブ（pg-boss）に積み、ワーカーが Claude API で審査する。
+  一時的な失敗は 3 回まで再試行し、それでも失敗したら `ai_check_failed = true` で admin_review へ。
+  モデル名・しきい値は `config/compliance.ts`、システムプロンプトは `prompts/compliance_check.md`
+- 監査ログの metadata には AI の判定（リスク・要約・指摘の種類と行番号・修正案）を残すが、指摘の抜粋（本文の一部）は
+  入れない。抜粋は `compliance_checks.findings` にだけ保存する
 - 遷移は「現在の状態を条件にした UPDATE」（`WHERE id = ? AND status = ?`）で行い、
   同時に 2 人の管理者が操作しても二重に処理されないようにする
 - AI チェックの結果が返ってきたときに、すでに別の版に置き換わっていたら結果は保存するが

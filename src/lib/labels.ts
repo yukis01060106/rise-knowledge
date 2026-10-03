@@ -39,6 +39,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   version_created: "版を作成",
   draft_discarded: "下書きを破棄",
   submitted: "レビュー申請",
+  prescan_blocked: "事前スキャンで申請を停止",
   ai_check_completed: "AI チェック完了",
   ai_check_failed: "AI チェック失敗",
   auto_rejected: "AI による自動差し戻し",

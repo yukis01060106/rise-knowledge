@@ -7,7 +7,7 @@ import type { Department, Role } from "@/generated/prisma/enums";
  */
 export async function resetDb() {
   await prisma.$executeRaw`ALTER TABLE audit_logs DISABLE TRIGGER USER`;
-  await prisma.$executeRaw`TRUNCATE audit_logs, version_tags, tags, images, article_versions, articles, sessions, accounts, users CASCADE`;
+  await prisma.$executeRaw`TRUNCATE audit_logs, compliance_checks, version_tags, tags, images, article_versions, articles, sessions, accounts, users CASCADE`;
   await prisma.$executeRaw`ALTER TABLE audit_logs ENABLE TRIGGER USER`;
 }
 

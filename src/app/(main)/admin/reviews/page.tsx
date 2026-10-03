@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { DepartmentBadge } from "@/components/ui/department-badge";
 import { CategoryBadge } from "@/components/ui/category-badge";
+import { RiskBadge } from "@/components/articles/compliance-panel";
 import { formatDateTime } from "@/lib/format";
 
 const DONE_MESSAGES: Record<string, string> = {
@@ -39,6 +40,7 @@ export default async function ReviewsPage({ searchParams }: PageProps<"/admin/re
                         {r.isUpdate ? `更新 v${r.versionNo}` : "新規"}
                       </span>
                       <CategoryBadge category={r.category} />
+                      <RiskBadge level={r.riskLevel} />
                       {r.aiCheckFailed && <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-900">AI チェック未実施</span>}
                       {r.showInitials && <span className="rounded bg-violet-50 px-1.5 py-0.5 text-violet-800">イニシャル表示</span>}
                       {self && <span className="rounded bg-gray-100 px-1.5 py-0.5">自分の記事</span>}

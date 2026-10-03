@@ -15,9 +15,11 @@
     "admin:grant": "tsx scripts/grant-admin.ts",
     "db:seed:dev": "tsx scripts/seed-dev.ts",
     "demo:publish": "npm run demo:build && git subtree split --prefix demo -b gh-pages && git push -f origin gh-pages && git branch -D gh-pages",
-    "demo:build": "tsx scripts/build-demo-data.ts && tailwindcss -i demo/styles.src.css -o demo/styles.css --minify"
+    "demo:build": "tsx scripts/build-demo-data.ts && tailwindcss -i demo/styles.src.css -o demo/styles.css --minify",
+    "worker": "tsx --conditions=react-server src/worker.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@auth/prisma-adapter": "^2.11.3",
     "@aws-sdk/client-s3": "^3.1146.0",
     "@prisma/adapter-pg": "^7.10.0",
@@ -29,6 +31,7 @@
     "next": "16.3.8",
     "next-auth": "^5.0.0-beta.32",
     "pg": "^8.23.1",
+    "pg-boss": "^12.36.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "rehype-sanitize": "^6.0.0",
