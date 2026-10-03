@@ -1,4 +1,4 @@
-# CLAUDE.md — rise tech solutions 社内ナレッジ共有サイト
+# CLAUDE.md — ライズ・ナレッジ（rise tech solutions 社内ナレッジ共有サイト）
 
 @AGENTS.md
 

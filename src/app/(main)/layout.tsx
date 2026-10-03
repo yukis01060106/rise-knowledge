@@ -23,7 +23,7 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5">
           <Link href="/" className="flex items-center gap-2 font-bold text-brand-strong">
             <Image src="/brand/logo.png" alt="" width={30} height={28} priority />
-            <span className="brand-text hidden text-lg tracking-tight sm:inline">rise ナレッジ</span>
+            <span className="brand-text hidden text-lg tracking-tight sm:inline">ライズ・ナレッジ</span>
           </Link>
           <form action="/search" role="search" className="ml-auto hidden w-72 md:block">
             <label htmlFor="header-search" className="sr-only">

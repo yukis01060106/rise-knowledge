@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "rise ナレッジ",
+  title: "ライズ・ナレッジ",
   description: "rise tech solutions 社内ナレッジ共有サイト",
   robots: { index: false, follow: false },
 };

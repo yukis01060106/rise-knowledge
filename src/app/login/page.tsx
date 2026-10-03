@@ -27,7 +27,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <span className="rounded-2xl bg-white p-2 shadow-lg">
             <Image src="/brand/logo.png" alt="" width={40} height={38} priority />
           </span>
-          <span className="text-xl font-bold">rise ナレッジ</span>
+          <span className="text-xl font-bold">ライズ・ナレッジ</span>
         </div>
         <div className="relative space-y-6">
           <p className="text-4xl leading-tight font-bold tracking-tight xl:text-5xl">
