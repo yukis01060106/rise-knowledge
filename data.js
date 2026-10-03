@@ -240,5 +240,23 @@ export function initialState() {
   audit.push({ id: id("l"), at, actor: "u-jiro", action: "submitted", articleId: pendingArticle, versionNo: 1 });
   audit.push({ id: id("l"), at, actor: null, action: "ai_check_completed", articleId: pendingArticle, versionNo: 1 });
 
-  return { version: 2, currentUserId: null, articles, versions, audit, seq: n };
+  // いいね・コメント・表彰（ランキングと今週のトレンドが空にならないように）
+  const byTitle = (t) => articles.find((a) => versions.find((v) => v.articleId === a.id && v.title.startsWith(t)));
+  const likes = [];
+  const like = (userId, title, daysAgo) => likes.push({ userId, articleId: byTitle(title).id, at: ago(daysAgo) });
+  like("u-taro", "Terraform", 0.5);
+  like("u-hanako", "Terraform", 0.8);
+  like("u-jiro", "Terraform", 1);
+  like("u-hanako", "常駐先で信頼", 1.2);
+  like("u-ichiro", "常駐先で信頼", 2);
+  like("u-hanako", "はじめての投稿", 1);
+  like("u-ichiro", "TypeScript", 1.5);
+  like("u-taro", "Linux", 3);
+  const comments = [
+    { id: id("c"), articleId: byTitle("Terraform").id, authorId: "u-hanako", body: "まさにこれでハマりました。**CI のジョブ** も確認するのが大事ですね！", at: ago(0.7), flagged: false },
+    { id: id("c"), articleId: byTitle("常駐先で信頼").id, authorId: "u-jiro", body: "3 行の報告、真似してみます。", at: ago(1.1), flagged: false },
+  ];
+  const awards = [{ month: new Date(Date.now() - 32 * day).toISOString().slice(0, 7), articleId: byTitle("Linux").id, comment: "原因の切り分け方がそのまま使える！" }];
+
+  return { version: 3, currentUserId: null, articles, versions, audit, likes, stocks: [], comments, notifications: [], awards, seq: n };
 }
