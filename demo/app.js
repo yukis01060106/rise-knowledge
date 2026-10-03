@@ -18,7 +18,7 @@ const STORAGE_KEY = "rise-knowledge-demo";
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
-    if (saved && saved.version === 2) return saved;
+    if (saved && saved.version === 3) return saved;
   } catch {
     // 読めなければ初期状態から始める
   }
@@ -54,6 +54,7 @@ const ACTIONS = {
   rejected: "差し戻し",
   article_hidden: "緊急非公開",
   article_unhidden: "再公開",
+  award_given: "月間ベストを表彰",
 };
 const TEMPLATES = [
   { id: "tech-memo", label: "技術メモ", body: "## 概要\n\n## 環境\n\n- OS：\n- バージョン：\n\n## 手順\n\n1. \n2. \n\n## 参考\n\n- \n" },
@@ -231,8 +232,9 @@ const btn = (variant = "primary", size = "md") =>
     { primary: "bg-brand text-white hover:bg-brand-strong", secondary: "border border-border bg-surface hover:bg-background", ghost: "text-muted hover:bg-background hover:text-foreground", danger: "border border-red-200 bg-surface text-danger hover:bg-red-50" }[variant]
   } ${size === "sm" ? "px-2.5 py-1 text-sm" : "px-4 py-2 text-sm"}`;
 
-const Link = ({ to, class: cls, children, onClick }) =>
-  html`<a href=${`#${to}`} class=${cls} onClick=${onClick}>${children}</a>`;
+// aria-label などの属性もそのまま <a> に渡す
+const Link = ({ to, class: cls, children, onClick, ...rest }) =>
+  html`<a href=${`#${to}`} class=${cls} onClick=${onClick} ...${rest}>${children}</a>`;
 
 function Avatar({ name, department, size = "md" }) {
   const s = { sm: "size-6 text-xs", md: "size-8 text-sm", lg: "size-12 text-lg" }[size];
@@ -289,8 +291,19 @@ function CategoryBadge({ category, size = "sm" }) {
 
 function cardData(state, a) {
   const v = publishedOf(state, a);
-  return { a, v, author: publicAuthor(state, a, v), facets: describeFacets(v.category, v.facets) };
+  return {
+    a,
+    v,
+    author: publicAuthor(state, a, v),
+    facets: describeFacets(v.category, v.facets),
+    likes: state.likes.filter((l) => l.articleId === a.id).length,
+    comments: state.comments.filter((c) => c.articleId === a.id).length,
+    award: state.awards.filter((w) => w.articleId === a.id).map((w) => w.month).sort().pop() ?? null,
+  };
 }
+const monthLabel = (m) => `${Number(m.slice(0, 4))}年${Number(m.slice(5, 7))}月`;
+const AwardBadge = ({ month }) =>
+  month ? html`<span class="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-2 py-0.5 text-xs font-bold text-white shadow-sm">🏆 ${monthLabel(month)}のベスト</span>` : null;
 const CardChips = ({ d, max = 4 }) => {
   const facets = d.facets.slice(0, max);
   const tags = d.v.tags.slice(0, Math.max(0, max - facets.length));
@@ -305,7 +318,11 @@ const CardMeta = ({ d }) => html`<div class="flex items-center gap-2 text-xs tex
   <${Avatar} name=${d.author.name} department=${d.author.department} size="sm" />
   <span class="font-medium text-foreground">${d.author.name}</span>
   <${DeptBadge} department=${d.author.department} />
-  <span class="ml-auto shrink-0">${fmtDate(d.a.firstPublishedAt)} ・ ${readingMinutes(d.v.body)} 分</span>
+  <span class="ml-auto flex shrink-0 items-center gap-2">
+    ${d.likes > 0 && html`<span class="text-pink-600">♥ ${d.likes}</span>`}
+    ${d.comments > 0 && html`<span>💬 ${d.comments}</span>`}
+    <span>${fmtDate(d.a.firstPublishedAt)} ・ ${readingMinutes(d.v.body)} 分</span>
+  </span>
 </div>`;
 
 function ArticleCards({ state, articles, columns = 1 }) {
@@ -314,7 +331,7 @@ function ArticleCards({ state, articles, columns = 1 }) {
       const d = cardData(state, a);
       return html`<li key=${a.id}>
         <${Link} to=${`/articles/${a.id}`} class="card group flex h-full flex-col gap-3 overflow-hidden p-5">
-          <div><${CategoryBadge} category=${d.v.category} /></div>
+          <div class="flex flex-wrap items-center gap-2"><${CategoryBadge} category=${d.v.category} /><${AwardBadge} month=${d.award} /></div>
           <h3 class="text-lg leading-snug font-bold group-hover:text-brand">${d.v.title}</h3>
           <p class="line-clamp-2 text-sm leading-relaxed text-muted">${excerptOf(d.v.body)}</p>
           <${CardChips} d=${d} />
@@ -330,7 +347,7 @@ function FeaturedArticle({ state, a }) {
   return html`<${Link} to=${`/articles/${a.id}`} class=${`cat-${d.v.category ?? "dev"} card group relative flex flex-col gap-4 overflow-hidden p-6 sm:p-8`}>
     <span aria-hidden="true" class="cat-gradient absolute inset-x-0 top-0 h-1.5"></span>
     <span aria-hidden="true" class="cat-gradient absolute -top-24 -right-24 size-56 rounded-full opacity-10"></span>
-    <div class="flex items-center gap-2"><span class="rounded-full bg-foreground px-2.5 py-0.5 text-xs font-bold text-white">NEW</span><${CategoryBadge} category=${d.v.category} /></div>
+    <div class="flex items-center gap-2"><span class="rounded-full bg-foreground px-2.5 py-0.5 text-xs font-bold text-white">NEW</span><${CategoryBadge} category=${d.v.category} /><${AwardBadge} month=${d.award} /></div>
     <h3 class="text-2xl leading-snug font-bold group-hover:text-brand sm:text-3xl">${d.v.title}</h3>
     <p class="line-clamp-3 leading-relaxed text-muted">${excerptOf(d.v.body, 140)}</p>
     <${CardChips} d=${d} max=${6} />
@@ -425,6 +442,14 @@ function HomePage({ state, me }) {
         </div>
       </section>
 
+      ${latestAward(state) &&
+      html`<${Link} to=${`/articles/${latestAward(state).articleId}`} class="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-amber-300 via-amber-400 to-orange-500 p-6 text-amber-950 shadow-lg sm:p-8">
+        <span aria-hidden="true" class="orbit -top-20 -right-20 size-72 border-white/40"></span>
+        <p class="relative text-sm font-bold">🏆 ${monthLabel(latestAward(state).month)}のベスト記事</p>
+        <p class="relative mt-2 text-2xl leading-snug font-bold group-hover:underline sm:text-3xl">${publishedOf(state, state.articles.find((a) => a.id === latestAward(state).articleId)).title}</p>
+        ${latestAward(state).comment && html`<p class="relative mt-2 text-sm">「${latestAward(state).comment}」</p>`}
+      <//>`}
+
       <section class="card relative overflow-hidden p-5 sm:p-6">
         <span aria-hidden="true" class="corner-wedge !size-16 opacity-70"></span>
         <div class="relative flex flex-wrap items-center justify-between gap-3 pl-10">
@@ -459,6 +484,15 @@ function HomePage({ state, me }) {
         </section>
         <aside class="space-y-6">
           <section class="card p-5">
+            <h2 class="text-sm font-bold">🔥 今週のトレンド</h2>
+            <ol class="mt-3 space-y-3">
+              ${trending(state).map(
+                ({ a, n }, i) => html`<li class="flex gap-3"><span class="brand-text w-5 shrink-0 text-lg font-bold">${i + 1}</span>
+                  <${Link} to=${`/articles/${a.id}`} class="min-w-0 text-sm leading-snug hover:text-brand"><span class="line-clamp-2 font-semibold">${publishedOf(state, a).title}</span><span class="text-xs text-pink-600">♥ ${n}</span><//></li>`,
+              )}
+            </ol>
+          </section>
+          <section class="card p-5">
             <h2 class="text-sm font-bold">自分の記事</h2>
             <div class="mt-3 grid grid-cols-2 gap-2 text-center">
               ${[["下書き", counts.draft, "draft"], ["審査中", counts.review, "review"], ["差し戻し", counts.rejected, "rejected"], ["公開中", counts.published, "published"]].map(
@@ -477,6 +511,18 @@ function HomePage({ state, me }) {
     </div>
   `;
 }
+
+function trending(state) {
+  const since = Date.now() - 7 * 86400_000;
+  const counts = new Map();
+  for (const l of state.likes) if (new Date(l.at).getTime() >= since) counts.set(l.articleId, (counts.get(l.articleId) ?? 0) + 1);
+  return [...counts]
+    .map(([id, n]) => ({ a: state.articles.find((a) => a.id === id), n }))
+    .filter((x) => x.a && x.a.publishedVersionId && !x.a.hidden)
+    .sort((x, y) => y.n - x.n)
+    .slice(0, 5);
+}
+const latestAward = (state) => [...state.awards].sort((a, b) => b.month.localeCompare(a.month))[0] ?? null;
 
 function tagSummary(state) {
   const counts = new Map();
@@ -609,7 +655,62 @@ function SearchPage({ state, query }) {
   `;
 }
 
-function ArticlePage({ state, me, id }) {
+function Engagement({ state, me, article, actions }) {
+  const liked = state.likes.some((l) => l.articleId === article.id && l.userId === me.id);
+  const count = state.likes.filter((l) => l.articleId === article.id).length;
+  const stocked = state.stocks.some((x) => x.articleId === article.id && x.userId === me.id);
+  const own = article.authorId === me.id;
+  return html`<div class="mt-10 flex flex-wrap items-center gap-2 border-t border-border pt-6">
+    <button type="button" disabled=${own} title=${own ? "自分の記事にはいいねできません" : ""} onClick=${() => actions.toggleLike(article.id)}
+      class=${`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold ${liked ? "bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow" : "bg-surface ring-1 ring-border"} ${own ? "opacity-60" : ""}`}>
+      ${liked ? "♥" : "♡"} いいね ${count}
+    </button>
+    <button type="button" onClick=${() => actions.toggleStock(article.id)}
+      class=${`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold ${stocked ? "brand-gradient text-white shadow" : "bg-surface ring-1 ring-border"}`}>
+      ${stocked ? "★ ストック済み" : "☆ ストック"}
+    </button>
+  </div>`;
+}
+
+function CommentsSection({ state, me, article, actions }) {
+  const [body, setBody] = useState("");
+  const [message, setMessage] = useState(null);
+  const list = state.comments.filter((c) => c.articleId === article.id);
+  const v = publishedOf(state, article);
+  const submit = (e) => {
+    e.preventDefault();
+    const r = actions.postComment(article.id, body);
+    setMessage(r);
+    if (r.ok) setBody("");
+  };
+  return html`<section class="card space-y-5 p-5 sm:p-8">
+    <h2 class="text-lg font-bold">コメント <span class="text-sm font-normal text-muted">${list.length}</span></h2>
+    ${list.length
+      ? html`<ul class="space-y-4">
+          ${list.map((c) => {
+            // イニシャル表示の記事では、著者本人のコメントもイニシャルにする
+            const u = userOf(c.authorId);
+            const name = v.showInitials && c.authorId === article.authorId ? publicAuthor(state, article, v).name : u.name;
+            return html`<li class="flex gap-3">
+              <${Avatar} name=${name} department=${u.department} size="sm" />
+              <div class="min-w-0 flex-1">
+                <p class="flex items-center gap-2 text-xs text-muted"><span class="font-semibold text-foreground">${name}</span>${fmtDateTime(c.at)}
+                  ${c.authorId === me.id && html`<button type="button" class="hover:text-danger" onClick=${() => confirm("削除しますか？") && actions.deleteComment(c.id)}>削除</button>`}</p>
+                <div class="mt-1 rounded-xl bg-background px-4 py-3 text-sm"><${Markdown} source=${c.body} /></div>
+              </div>
+            </li>`;
+          })}
+        </ul>`
+      : html`<p class="text-sm text-muted">まだコメントはありません。感想や補足、質問を書いてみましょう。</p>`}
+    <form onSubmit=${submit} class="space-y-2">
+      <textarea required rows="3" value=${body} onInput=${(e) => setBody(e.target.value)} placeholder="Markdown が使えます。客先名・パスワードなどの機密情報は書かないでください。" class="w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm focus:border-brand focus:outline-none"></textarea>
+      ${message && html`<p class=${`rounded-lg px-3 py-2 text-sm ${message.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"}`}>${message.message}</p>`}
+      <div class="flex justify-end"><button class=${btn() + " brand-gradient rounded-full px-5"}>コメントする</button></div>
+    </form>
+  </section>`;
+}
+
+function ArticlePage({ state, me, id, actions }) {
   const article = state.articles.find((a) => a.id === id);
   if (!article) return html`<${Empty} title="記事が見つかりません" />`;
   const isAuthor = article.authorId === me.id;
@@ -652,7 +753,7 @@ function ArticlePage({ state, me, id }) {
             </div>
             ${isAuthor && !working && html`<${Link} to=${`/articles/${id}/edit`} class=${btn("secondary", "sm") + " ml-auto"}>編集する<//>`}
           </div>
-          <div class="mt-6 flex flex-wrap items-center gap-2 text-xs text-muted"><${CategoryBadge} category=${shown.category} /><span>読了 ${readingMinutes(shown.body)} 分</span></div>
+          <div class="mt-6 flex flex-wrap items-center gap-2 text-xs text-muted"><${CategoryBadge} category=${shown.category} />${state.awards.filter((w) => w.articleId === article.id).map((w) => html`<${AwardBadge} month=${w.month} />`)}<span>読了 ${readingMinutes(shown.body)} 分</span></div>
           <h1 class="mt-3 text-2xl leading-snug font-bold tracking-tight sm:text-4xl">${shown.title || "（無題）"}</h1>
           <div class="mt-5 flex flex-wrap gap-1.5">
             ${describeFacets(shown.category, shown.facets).map((f) => html`<${Link} to=${`/articles?cat=${shown.category}&f=${encodeURIComponent(f.key)}`} class="cat-soft rounded-md px-2 py-0.5 text-xs font-medium">${f.label}<//>`)}
@@ -660,7 +761,9 @@ function ArticlePage({ state, me, id }) {
           </div>
         </header>
         <${Markdown} source=${shown.body} />
+        ${published && !article.hidden && html`<${Engagement} state=${state} me=${me} article=${article} actions=${actions} />`}
       </article>
+      ${published && !article.hidden && html`<${CommentsSection} state=${state} me=${me} article=${article} actions=${actions} />`}
     </div>
   `;
 }
@@ -904,6 +1007,116 @@ function SettingsPage({ state, me, actions }) {
       </form>
     </div>
   `;
+}
+
+function StocksPage({ state, me }) {
+  const list = state.stocks
+    .filter((x) => x.userId === me.id)
+    .map((x) => state.articles.find((a) => a.id === x.articleId))
+    .filter((a) => a && a.publishedVersionId && !a.hidden);
+  return html`<div>
+    <${PageHeader} title="ストック" description="あとで読みたい記事。記事ページの「ストック」から追加できます。" />
+    ${list.length ? html`<${ArticleCards} state=${state} articles=${list} columns=${2} />` : html`<${Empty} title="ストックした記事はありません" />`}
+  </div>`;
+}
+
+const NOTICE = {
+  approved: ["🎉", (n) => `「${n.title}」が承認され、公開されました`],
+  rejected: ["↩", (n) => `「${n.title}」が差し戻されました`],
+  liked: ["♥", (n) => `${n.actorName} さんが「${n.title}」にいいねしました`],
+  commented: ["💬", (n) => `${n.actorName} さんが「${n.title}」にコメントしました`],
+  review_requested: ["📝", (n) => `「${n.title}」のレビュー待ちがあります`],
+  award: ["🏆", (n) => `「${n.title}」が${monthLabel(n.month)}のベスト記事に選ばれました！`],
+};
+
+function NotificationsPage({ state, me, actions }) {
+  const list = state.notifications.filter((n) => n.userId === me.id).slice().reverse();
+  useEffect(() => {
+    if (list.some((n) => !n.read)) {
+      const t = setTimeout(() => actions.markRead(), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [list.length]);
+  return html`<div class="mx-auto max-w-3xl">
+    <${PageHeader} title="通知" description="承認・差し戻し・いいね・コメントなど。通知には記事の本文は入りません" />
+    ${list.length
+      ? html`<ul class="card divide-y divide-border overflow-hidden">
+          ${list.map((n) => {
+            const [icon, text] = NOTICE[n.type];
+            const to = n.type === "review_requested" ? "/admin/reviews" : n.type === "rejected" ? `/articles/${n.articleId}/edit` : `/articles/${n.articleId}`;
+            return html`<li><${Link} to=${to} class=${`flex gap-3 px-5 py-4 hover:bg-background ${n.read ? "" : "bg-brand-soft/40"}`}>
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-background">${icon}</span>
+              <div class="min-w-0 flex-1"><p class="text-sm">${!n.read && html`<span class="mr-1.5 inline-block size-2 rounded-full bg-accent align-middle"></span>`}${text(n)}</p>
+                ${n.reason && html`<p class="mt-1 text-xs text-muted">理由：${n.reason}</p>`}
+                <p class="mt-1 text-xs text-muted">${fmtDateTime(n.at)}</p></div>
+            <//></li>`;
+          })}
+        </ul>`
+      : html`<${Empty} title="通知はまだありません">記事にいいね・コメントが付いたり、審査の結果が出たりすると届きます。<//>`}
+  </div>`;
+}
+
+function RankingsPage({ state, me, actions, query }) {
+  const nowMonth = new Date().toISOString().slice(0, 7);
+  const month = /^\d{4}-\d{2}$/.test(query.get("month") ?? "") ? query.get("month") : nowMonth;
+  const shift = (m, d) => {
+    const dt = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1 + d, 1));
+    return dt.toISOString().slice(0, 7);
+  };
+  const inMonth = state.likes.filter((l) => l.at.slice(0, 7) === month);
+  const counts = new Map();
+  for (const l of inMonth) counts.set(l.articleId, (counts.get(l.articleId) ?? 0) + 1);
+  const ranked = [...counts]
+    .map(([id, n]) => ({ a: state.articles.find((a) => a.id === id), n }))
+    .filter((x) => x.a && x.a.publishedVersionId && !x.a.hidden)
+    .sort((x, y) => y.n - x.n);
+  // 投稿者ランキング：イニシャル表示の記事は数えない
+  const authors = new Map();
+  for (const { a, n } of ranked) if (!publishedOf(state, a).showInitials) authors.set(a.authorId, (authors.get(a.authorId) ?? 0) + n);
+  const award = state.awards.find((w) => w.month === month);
+  const medal = (i) => ["🥇", "🥈", "🥉"][i] ?? i + 1;
+  return html`<div class="space-y-6">
+    <header class="brand-gradient relative overflow-hidden rounded-3xl px-6 py-7 text-white sm:px-8">
+      <span aria-hidden="true" class="orbit orbit-spin -top-24 -right-16 size-72 border-t-white/50 border-r-transparent"></span>
+      <p class="relative text-sm text-white/80">月間ランキング</p>
+      <div class="relative mt-1 flex items-center gap-3">
+        <${Link} to=${`/rankings?month=${shift(month, -1)}`} class="rounded-full bg-white/15 px-3 py-1 text-sm ring-1 ring-white/40">←<//>
+        <h1 class="text-2xl font-bold sm:text-3xl">${monthLabel(month)}</h1>
+        ${month < nowMonth && html`<${Link} to=${`/rankings?month=${shift(month, 1)}`} class="rounded-full bg-white/15 px-3 py-1 text-sm ring-1 ring-white/40">→<//>`}
+      </div>
+      <p class="relative mt-1 text-sm text-white/85">その月についた「いいね」の数で並べています。</p>
+    </header>
+    <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <section class="space-y-3">
+        <h2 class="text-lg font-bold">記事ランキング</h2>
+        ${ranked.length
+          ? html`<ol class="space-y-3">${ranked.map(({ a, n }, i) => {
+              const d = cardData(state, a);
+              return html`<li class="card flex items-center gap-4 p-4 ${award?.articleId === a.id ? "ring-2 ring-amber-400" : ""}">
+                <span class="w-10 shrink-0 text-center text-2xl font-bold">${medal(i)}</span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap gap-2"><${CategoryBadge} category=${d.v.category} />${award?.articleId === a.id && html`<${AwardBadge} month=${month} />`}</div>
+                  <${Link} to=${`/articles/${a.id}`} class="mt-1 block font-bold hover:text-brand">${d.v.title}<//>
+                  <p class="text-xs text-muted">${d.author.name}</p>
+                  ${me.role === "admin" && !award && a.authorId !== me.id && html`<button type="button" class="mt-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-3 py-1 text-xs font-bold text-white" onClick=${() => confirm("この記事を月間ベストに選びますか？") && actions.giveAward(month, a.id)}>🏆 月間ベストに選ぶ（管理者）</button>`}
+                </div>
+                <span class="text-lg font-bold text-pink-600">♥ ${n}</span>
+              </li>`;
+            })}</ol>`
+          : html`<${Empty} title="この月のいいねはまだありません" />`}
+      </section>
+      <aside class="space-y-3">
+        <h2 class="text-lg font-bold">投稿者ランキング</h2>
+        ${authors.size
+          ? html`<ol class="card divide-y divide-border overflow-hidden">${[...authors].sort((x, y) => y[1] - x[1]).map(([uid, n], i) => {
+              const u = userOf(uid);
+              return html`<li class="flex items-center gap-3 px-4 py-3"><span class="w-6 text-center font-bold">${medal(i)}</span><${Avatar} name=${u.name} department=${u.department} size="sm" /><span class="flex-1 text-sm font-semibold">${u.name}</span><span class="text-sm font-bold text-pink-600">♥ ${n}</span></li>`;
+            })}</ol>`
+          : html`<${Empty} title="まだいません" />`}
+        <p class="text-xs text-muted">※ イニシャル表示の記事は、投稿者ランキングには数えません。</p>
+      </aside>
+    </div>
+  </div>`;
 }
 
 /* ───────── 理念・バリュー ───────── */
@@ -1227,6 +1440,9 @@ const ICONS = {
   manage: "M4 6h16M4 12h16M4 18h10",
   audit: "M12 8v4l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z",
   about: "M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z",
+  rank: "M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM17 6h3v2a3 3 0 0 1-3 3M7 6H4v2a3 3 0 0 0 3 3",
+  stock: "M6 3h12v18l-6-4-6 4z",
+  bell: "M18 16v-5a6 6 0 1 0-12 0v5l-2 2h16zM10 20a2 2 0 0 0 4 0",
 };
 
 function SideNav({ me, path, query, pending, onNavigate }) {
@@ -1237,6 +1453,7 @@ function SideNav({ me, path, query, pending, onNavigate }) {
         ["/articles", "記事", "articles", (p) => (p === "/articles" && !query.get("cat")) || /^\/articles\/[^/]+$/.test(p)],
         ["/tags", "タグ", "tags", (p) => p.startsWith("/tags")],
         ["/search", "検索", "search", (p) => p.startsWith("/search")],
+        ["/rankings", "ランキング", "rank", (p) => p.startsWith("/rankings")],
         ["/about", "理念・バリュー", "about", (p) => p.startsWith("/about")],
       ],
     },
@@ -1249,6 +1466,8 @@ function SideNav({ me, path, query, pending, onNavigate }) {
       items: [
         ["/articles/new", "記事を書く", "write", (p) => p === "/articles/new" || p.endsWith("/edit")],
         ["/me/articles", "自分の記事", "mine", (p) => p.startsWith("/me/articles")],
+        ["/me/stocks", "ストック", "stock", (p) => p.startsWith("/me/stocks")],
+        ["/notifications", "通知", "bell", (p) => p.startsWith("/notifications")],
         ["/me/settings", "設定", "settings", (p) => p.startsWith("/me/settings")],
       ],
     },
@@ -1287,6 +1506,7 @@ function Shell({ state, me, route, actions, children }) {
   const [drawer, setDrawer] = useState(false);
   const [menu, setMenu] = useState(false);
   const pending = me.role === "admin" ? state.versions.filter((v) => v.status === "admin_review").length : 0;
+  const unread = state.notifications.filter((n) => n.userId === me.id && !n.read).length;
   const [q, setQ] = useState("");
   useEffect(() => {
     setDrawer(false);
@@ -1312,6 +1532,10 @@ function Shell({ state, me, route, actions, children }) {
             <input value=${q} onInput=${(e) => setQ(e.target.value)} type="search" placeholder="記事を検索" class="w-full rounded-full border border-border bg-surface/80 px-4 py-1.5 text-sm focus:border-brand focus:bg-surface focus:outline-none" />
           </form>
           <div class="ml-auto flex items-center gap-2 md:ml-0">
+            <${Link} to="/notifications" class="relative rounded-full p-2 text-muted hover:bg-background" aria-label="通知">
+              ${ICON(ICONS.bell)}
+              ${unread > 0 && html`<span class="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-accent px-1 text-center text-[10px] leading-4 font-bold text-white">${unread}</span>`}
+            <//>
             <${Link} to="/articles/new" class=${btn("primary", "sm") + " brand-gradient rounded-full px-3.5 shadow-sm"}>記事を書く<//>
             <div class="relative">
               <button type="button" onClick=${() => setMenu(!menu)} class="rounded-md px-1 py-1 hover:bg-background" aria-label="ユーザーメニュー"><${Avatar} name=${me.name} department=${dept} /></button>
@@ -1371,6 +1595,11 @@ function useDemo() {
   const now = () => new Date().toISOString();
   const newId = (s, p) => `${p}-${++s.seq}`;
   const log = (s, entry) => s.audit.push({ id: newId(s, "l"), at: now(), ...entry });
+  // 通知（本物と同じく、記事の本文は入れない）
+  const notify = (s, userId, type, articleId, extra = {}) => {
+    const v = publishedOf(s, s.articles.find((a) => a.id === articleId)) ?? latestVersion(s, articleId);
+    s.notifications.push({ id: newId(s, "n"), userId, type, articleId, title: v?.title ?? "", at: now(), read: false, ...extra });
+  };
 
   // AI チェック中の版は、少し待ってから管理者の確認待ちに進める（デモでは判定はせず通過）
   useEffect(() => {
@@ -1382,6 +1611,10 @@ function useDemo() {
           for (const v of s.versions.filter((x) => x.status === "ai_review")) {
             v.status = "admin_review";
             log(s, { actor: null, action: "ai_check_completed", articleId: v.articleId, versionNo: v.no });
+            const author = s.articles.find((a) => a.id === v.articleId).authorId;
+            for (const u of USERS.filter((x) => x.role === "admin" && x.id !== author)) {
+              s.notifications.push({ id: newId(s, "n"), userId: u.id, type: "review_requested", articleId: v.articleId, title: v.title, at: now(), read: false });
+            }
           }
         }),
       1500,
@@ -1457,6 +1690,7 @@ function useDemo() {
         a.publishedVersionId = v.id;
         a.firstPublishedAt ??= now();
         log(s, { actor: s.currentUserId, action: "approved", articleId: a.id, versionNo: v.no });
+        notify(s, a.authorId, "approved", a.id);
       }),
     reject: (versionId, reason) =>
       update((s) => {
@@ -1465,6 +1699,53 @@ function useDemo() {
         if (v.status !== "admin_review" || a.authorId === s.currentUserId) return;
         Object.assign(v, { status: "rejected", decidedAt: now(), decidedBy: s.currentUserId, rejectReason: reason });
         log(s, { actor: s.currentUserId, action: "rejected", articleId: a.id, versionNo: v.no, reason });
+        notify(s, a.authorId, "rejected", a.id, { reason });
+      }),
+    toggleLike: (articleId) =>
+      update((s) => {
+        const a = s.articles.find((x) => x.id === articleId);
+        if (!a || a.authorId === s.currentUserId) return; // 自分の記事にはいいねできない
+        const i = s.likes.findIndex((l) => l.articleId === articleId && l.userId === s.currentUserId);
+        if (i >= 0) s.likes.splice(i, 1);
+        else {
+          s.likes.push({ userId: s.currentUserId, articleId, at: now() });
+          notify(s, a.authorId, "liked", articleId, { actorName: userOf(s.currentUserId).name });
+        }
+      }),
+    toggleStock: (articleId) =>
+      update((s) => {
+        const i = s.stocks.findIndex((x) => x.articleId === articleId && x.userId === s.currentUserId);
+        if (i >= 0) s.stocks.splice(i, 1);
+        else s.stocks.push({ userId: s.currentUserId, articleId, at: now() });
+      }),
+    postComment: (articleId, body) => {
+      const text = body.trim();
+      if (!text) return { ok: false, message: "コメントを入力してください" };
+      // 本物は事前スキャン＋AI チェック。デモでは明らかな秘密情報だけ止める
+      if (/-----BEGIN [A-Z ]*PRIVATE KEY-----|(?<![a-z])(password|passwd|secret)\s*[:=]\s*\S{6,}/i.test(text)) {
+        return { ok: false, message: "公開できない情報（パスワード・秘密鍵など）が含まれているため、投稿できません" };
+      }
+      update((s) => {
+        s.comments.push({ id: newId(s, "c"), articleId, authorId: s.currentUserId, body: text, at: now(), flagged: false });
+        const a = s.articles.find((x) => x.id === articleId);
+        if (a.authorId !== s.currentUserId) notify(s, a.authorId, "commented", articleId, { actorName: userOf(s.currentUserId).name });
+      });
+      return { ok: true, message: "投稿しました" };
+    },
+    deleteComment: (commentId) =>
+      update((s) => {
+        s.comments = s.comments.filter((c) => !(c.id === commentId && c.authorId === s.currentUserId));
+      }),
+    markRead: () =>
+      update((s) => {
+        for (const n of s.notifications) if (n.userId === s.currentUserId) n.read = true;
+      }),
+    giveAward: (month, articleId) =>
+      update((s) => {
+        if (userOf(s.currentUserId).role !== "admin" || s.awards.some((w) => w.month === month)) return;
+        s.awards.push({ month, articleId, comment: null });
+        log(s, { actor: s.currentUserId, action: "award_given", articleId });
+        notify(s, s.articles.find((a) => a.id === articleId).authorId, "award", articleId, { month });
       }),
     setHidden: (articleId, hidden, reason) =>
       update((s) => {
@@ -1499,6 +1780,9 @@ function App() {
   else if (p === "/tags") page = html`<${TagsPage} ...${props} />`;
   else if ((m = p.match(/^\/tags\/(.+)$/))) page = html`<${TagPage} ...${props} name=${decodeURIComponent(m[1])} />`;
   else if (p === "/search") page = html`<${SearchPage} key=${route.query.get("q")} ...${props} />`;
+  else if (p === "/me/stocks") page = html`<${StocksPage} ...${props} />`;
+  else if (p === "/notifications") page = html`<${NotificationsPage} ...${props} />`;
+  else if (p === "/rankings") page = html`<${RankingsPage} ...${props} />`;
   else if (p === "/me/articles") page = html`<${MyArticlesPage} ...${props} />`;
   else if (p === "/me/settings") page = html`<${SettingsPage} key=${me.id} ...${props} />`;
   else if (p.startsWith("/admin") && me.role !== "admin") page = html`<${Empty} title="このページを表示する権限がありません">管理者（管理 花子）に切り替えると見られます。<//>`;
