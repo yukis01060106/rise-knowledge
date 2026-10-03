@@ -67,7 +67,7 @@ function sections(isAdmin: boolean, pendingReviews: number): Section[] {
 
 export type SideNavProps = { isAdmin: boolean; pendingReviews: number; onNavigate?: () => void };
 
-/** 左のメニュー。PC ではサイドバー、スマホではドロワーの中に表示する */
+/** メインメニュー。PC では右のサイドバー、スマホではドロワーの中に表示する */
 export function SideNav({ isAdmin, pendingReviews, onNavigate }: SideNavProps) {
   const pathname = usePathname();
   return (

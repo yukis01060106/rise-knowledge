@@ -19,7 +19,6 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
     <>
       <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5">
-          <MobileNav isAdmin={isAdmin} pendingReviews={pendingReviews} />
           <Link href="/" className="flex items-center gap-2 font-bold text-brand-strong">
             <span aria-hidden className="inline-flex size-7 items-center justify-center rounded-md bg-brand text-sm text-white">
               r
@@ -43,11 +42,14 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
               記事を書く
             </Link>
             <UserMenu name={user.name} email={user.email} department={user.department} role={user.role} />
+            {/* 右利きの人が多いため、メニューは右側に置く */}
+            <MobileNav isAdmin={isAdmin} pendingReviews={pendingReviews} />
           </div>
         </div>
       </header>
-      <div className="mx-auto grid w-full max-w-7xl flex-1 gap-8 px-4 lg:grid-cols-[200px_minmax(0,1fr)]">
-        <aside className="hidden lg:block">
+      <div className="mx-auto grid w-full max-w-7xl flex-1 gap-8 px-4 lg:grid-cols-[minmax(0,1fr)_200px]">
+        {/* メニューは右側（右利きの人が多いため）。読み上げ順ではメニューを先にする */}
+        <aside className="hidden lg:order-last lg:block">
           <div className="sticky top-16 py-8">
             <SideNav isAdmin={isAdmin} pendingReviews={pendingReviews} />
           </div>

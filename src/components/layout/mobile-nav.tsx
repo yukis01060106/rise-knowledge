@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { SideNav, type SideNavProps } from "./side-nav";
 
-/** スマホ用：ハンバーガーボタンと、左から出るメニュー */
+/** スマホ用：ハンバーガーボタンと、右から出るメニュー */
 export function MobileNav(props: Omit<SideNavProps, "onNavigate">) {
   const [open, setOpen] = useState(false);
 
@@ -26,7 +26,7 @@ export function MobileNav(props: Omit<SideNavProps, "onNavigate">) {
         onClick={() => setOpen(true)}
         aria-label="メニューを開く"
         aria-expanded={open}
-        className="-ml-1 rounded-md p-1.5 text-foreground hover:bg-background lg:hidden"
+        className="-mr-1 rounded-md p-1.5 text-foreground hover:bg-background lg:hidden"
       >
         <svg
           aria-hidden
@@ -53,7 +53,7 @@ export function MobileNav(props: Omit<SideNavProps, "onNavigate">) {
               className="absolute inset-0 bg-black/30"
               onClick={() => setOpen(false)}
             />
-            <div className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col gap-4 overflow-y-auto bg-background p-4 shadow-xl">
+            <div className="absolute inset-y-0 right-0 flex w-72 max-w-[85vw] flex-col gap-4 overflow-y-auto bg-background p-4 shadow-xl">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-brand-strong">メニュー</span>
                 <button
