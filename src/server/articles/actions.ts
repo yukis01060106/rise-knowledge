@@ -14,6 +14,8 @@ const saveSchema = z.object({
   title: z.string().trim().max(MAX_TITLE_LENGTH, `タイトルは ${MAX_TITLE_LENGTH} 文字以内にしてください`),
   bodyMd: z.string().max(MAX_BODY_LENGTH, `本文は ${MAX_BODY_LENGTH.toLocaleString()} 文字以内にしてください`),
   tags: z.array(z.string().max(200)).max(50),
+  /** 著者名をイニシャルで表示する（設定画面でイニシャルを登録していること） */
+  showInitials: z.boolean().default(false),
   /** 編集を始めたときの版の更新日時。別のタブなどで先に保存されていたら上書きしない */
   expectedUpdatedAt: z.iso.datetime().nullable(),
 });
@@ -54,14 +56,17 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
   if (!parsed.success) return { ok: false, code: "invalid", message: parsed.error.issues[0]?.message ?? "入力が不正です" };
   const tags = parseTags(parsed.data.tags);
   if (!tags.ok) return { ok: false, code: "invalid", message: tags.message };
-  const { articleId, title, bodyMd, expectedUpdatedAt } = parsed.data;
+  const { articleId, title, bodyMd, expectedUpdatedAt, showInitials } = parsed.data;
+  if (showInitials && !user.initials) {
+    return { ok: false, code: "invalid", message: "イニシャル表示にするには、先に設定画面でイニシャルを登録してください" };
+  }
 
   try {
     return await prisma.$transaction(async (tx): Promise<SaveDraftResult> => {
       if (!articleId) {
         const article = await tx.article.create({ data: { authorId: user.id }, select: { id: true } });
         const version = await tx.articleVersion.create({
-          data: { articleId: article.id, versionNo: 1, title, bodyMd, createdBy: user.id },
+          data: { articleId: article.id, versionNo: 1, title, bodyMd, showInitials, createdBy: user.id },
           select: { id: true, versionNo: true, updatedAt: true },
         });
         await replaceTags(tx, version.id, tags.tags);
@@ -96,7 +101,7 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
         if (expectedUpdatedAt && latest.updatedAt.toISOString() !== expectedUpdatedAt) return CONFLICT;
         const version = await tx.articleVersion.update({
           where: { id: latest.id },
-          data: { title, bodyMd },
+          data: { title, bodyMd, showInitials },
           select: { id: true, versionNo: true, updatedAt: true },
         });
         await replaceTags(tx, version.id, tags.tags);
@@ -113,6 +118,7 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
           versionNo,
           title,
           bodyMd,
+          showInitials,
           createdBy: user.id,
           basedOnVersionId,
         },

@@ -25,6 +25,9 @@ export function UserMenu({ name, email, department, role }: Props) {
         <Link href="/me/articles" className={item}>
           自分の記事
         </Link>
+        <Link href="/me/settings" className={item}>
+          設定
+        </Link>
         {role === "admin" && (
           <Link href="/admin/reviews" className={item}>
             管理画面

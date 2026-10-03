@@ -13,7 +13,7 @@ export function ArticleList({ articles }: { articles: ArticleCard[] }) {
           <Avatar name={a.author.name} department={a.author.department} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-              <span className="font-medium text-foreground">{a.author.name ?? "名前未設定"}</span>
+              <span className="font-medium text-foreground">{a.author.name}</span>
               <DepartmentBadge department={a.author.department} />
               <span>{formatDate(a.firstPublishedAt)}</span>
             </div>

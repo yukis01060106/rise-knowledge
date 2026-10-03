@@ -38,6 +38,7 @@ export default async function ReviewsPage({ searchParams }: PageProps<"/admin/re
                         {r.isUpdate ? `更新 v${r.versionNo}` : "新規"}
                       </span>
                       {r.aiCheckFailed && <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-900">AI チェック未実施</span>}
+                      {r.showInitials && <span className="rounded bg-violet-50 px-1.5 py-0.5 text-violet-800">イニシャル表示</span>}
                       {self && <span className="rounded bg-gray-100 px-1.5 py-0.5">自分の記事</span>}
                       <span>{r.author.name ?? "名前未設定"}</span>
                       <DepartmentBadge department={r.author.department} />

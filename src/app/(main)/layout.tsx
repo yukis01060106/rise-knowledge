@@ -1,30 +1,32 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/server/auth/guards";
-import { NavLinks } from "@/components/layout/nav-links";
+import { countPendingReviews } from "@/server/articles/admin-queries";
+import { MobileNav } from "@/components/layout/mobile-nav";
+import { SideNav } from "@/components/layout/side-nav";
 import { UserMenu } from "@/components/layout/user-menu";
 import { buttonClass } from "@/components/ui/button";
-import { countPendingReviews } from "@/server/articles/admin-queries";
 
 // ログイン後の画面の共通レイアウト。各ページでも requireUser / requireAdmin を呼ぶこと
 // （レイアウトはページ遷移のたびに再実行されるとは限らないため）
 export default async function MainLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
   if (!user.department) redirect("/onboarding");
-  const pendingReviews = user.role === "admin" ? await countPendingReviews(user) : 0;
+  const isAdmin = user.role === "admin";
+  const pendingReviews = isAdmin ? await countPendingReviews(user) : 0;
 
   return (
     <>
-      <header className="sticky top-0 z-10 border-b border-border bg-surface/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5">
+      <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5">
+          <MobileNav isAdmin={isAdmin} pendingReviews={pendingReviews} />
           <Link href="/" className="flex items-center gap-2 font-bold text-brand-strong">
             <span aria-hidden className="inline-flex size-7 items-center justify-center rounded-md bg-brand text-sm text-white">
               r
             </span>
-            rise ナレッジ
+            <span className="hidden sm:inline">rise ナレッジ</span>
           </Link>
-          <NavLinks />
-          <form action="/search" role="search" className="order-last w-full sm:order-none sm:ml-auto sm:w-64">
+          <form action="/search" role="search" className="ml-auto hidden w-72 md:block">
             <label htmlFor="header-search" className="sr-only">
               記事を検索
             </label>
@@ -36,15 +38,7 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
               className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:border-brand focus:bg-surface focus:outline-none"
             />
           </form>
-          <div className="ml-auto flex items-center gap-2 sm:ml-0">
-            {user.role === "admin" && (
-              <Link href="/admin/reviews" className={buttonClass("ghost", "sm")}>
-                レビュー
-                {pendingReviews > 0 && (
-                  <span className="rounded-full bg-accent px-1.5 text-xs font-bold text-white">{pendingReviews}</span>
-                )}
-              </Link>
-            )}
+          <div className="ml-auto flex items-center gap-2 md:ml-0">
             <Link href="/articles/new" className={buttonClass("primary", "sm")}>
               記事を書く
             </Link>
@@ -52,7 +46,14 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+      <div className="mx-auto grid w-full max-w-7xl flex-1 gap-8 px-4 lg:grid-cols-[200px_minmax(0,1fr)]">
+        <aside className="hidden lg:block">
+          <div className="sticky top-16 py-8">
+            <SideNav isAdmin={isAdmin} pendingReviews={pendingReviews} />
+          </div>
+        </aside>
+        <main className="min-w-0 py-8">{children}</main>
+      </div>
       <footer className="border-t border-border py-6 text-center text-xs text-muted">
         rise tech solutions 社内限定 ・ 離れていても、ひとつのチーム！
       </footer>

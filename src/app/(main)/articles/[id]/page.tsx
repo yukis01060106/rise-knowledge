@@ -37,7 +37,12 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[id]"
           <div className="flex items-center gap-3">
             <Avatar name={article.author.name} department={article.author.department} />
             <div className="text-sm">
-              <p className="font-semibold">{article.author.name ?? "名前未設定"}</p>
+              <p className="font-semibold">
+                {article.author.name}
+                {article.isAuthor && article.author.isInitials && (
+                  <span className="ml-2 rounded bg-background px-1.5 py-0.5 text-xs font-normal text-muted">イニシャルで表示中</span>
+                )}
+              </p>
               <p className="flex items-center gap-2 text-xs text-muted">
                 <DepartmentBadge department={article.author.department} />
                 {article.firstPublishedAt ? `${formatDate(article.firstPublishedAt)} に公開` : "未公開"}

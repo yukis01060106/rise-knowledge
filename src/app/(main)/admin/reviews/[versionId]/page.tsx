@@ -31,6 +31,11 @@ export default async function ReviewPage({ params }: PageProps<"/admin/reviews/[
             <Avatar name={article.author.name} department={article.author.department} size="sm" />
             <span className="text-foreground">{article.author.name ?? "名前未設定"}</span>
             <DepartmentBadge department={article.author.department} />
+            {version.showInitials && (
+              <span className="rounded bg-violet-50 px-1.5 py-0.5 text-xs text-violet-800">
+                イニシャル表示（{article.author.initials}）で公開
+              </span>
+            )}
             <span>v{version.versionNo}</span>
             <span>申請 {formatDateTime(version.submittedAt)}</span>
           </div>

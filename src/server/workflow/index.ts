@@ -77,7 +77,7 @@ async function latestVersion(tx: Tx, articleId: string) {
   return tx.articleVersion.findFirst({
     where: { articleId },
     orderBy: { versionNo: "desc" },
-    select: { id: true, versionNo: true, status: true, title: true, bodyMd: true },
+    select: { id: true, versionNo: true, status: true, title: true, bodyMd: true, showInitials: true },
   });
 }
 
@@ -107,6 +107,10 @@ export function submitForReview(actor: Actor, articleId: string) {
       }
       if (!version.title.trim()) throw new WorkflowError("invalid", "タイトルを入力してください");
       if (!version.bodyMd.trim()) throw new WorkflowError("invalid", "本文を入力してください");
+      if (version.showInitials) {
+        const author = await tx.user.findUniqueOrThrow({ where: { id: actor.id }, select: { initials: true } });
+        if (!author.initials) throw new WorkflowError("invalid", "イニシャル表示にするには、先に設定画面でイニシャルを登録してください");
+      }
 
       await move(tx, version.id, "submit", { submittedAt: new Date() });
       await writeAuditLog(tx, {

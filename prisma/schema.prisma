@@ -60,6 +60,8 @@ model User {
   emailVerified DateTime?   @map("email_verified") @db.Timestamptz
   image         String?
   department    Department?
+  // 記事をイニシャル表示で投稿するときの表記（例：K.T.）。本人が設定画面で登録する
+  initials      String?
   role          Role        @default(member)
   disabledAt    DateTime?   @map("disabled_at") @db.Timestamptz
   lastLoginAt   DateTime?   @map("last_login_at") @db.Timestamptz
@@ -109,6 +111,8 @@ model ArticleVersion {
   bodyMd           String        @map("body_md")
   status           VersionStatus @default(draft)
   aiCheckFailed    Boolean       @default(false) @map("ai_check_failed")
+  // 著者名をイニシャルで表示する（審査の対象。審査に出した後は変更できない）
+  showInitials     Boolean       @default(false) @map("show_initials")
   basedOnVersionId String?       @map("based_on_version_id") @db.Uuid
   createdBy        String        @map("created_by") @db.Uuid
   submittedAt      DateTime?     @map("submitted_at") @db.Timestamptz

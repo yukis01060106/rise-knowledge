@@ -9,7 +9,7 @@ export type CurrentUser = NonNullable<Awaited<ReturnType<typeof loadUser>>>;
 function loadUser(id: string) {
   return prisma.user.findUnique({
     where: { id },
-    select: { id: true, email: true, name: true, department: true, role: true, disabledAt: true },
+    select: { id: true, email: true, name: true, initials: true, department: true, role: true, disabledAt: true },
   });
 }
 

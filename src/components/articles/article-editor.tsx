@@ -18,6 +18,9 @@ type Props = {
   initialUpdatedAt: string | null;
   /** 公開済みの記事を編集しているか（保存すると新しい版になる） */
   editingPublished: boolean;
+  initialShowInitials: boolean;
+  /** 設定画面で登録したイニシャル（未登録なら null） */
+  myInitials: string | null;
   /** 差し戻された版を修正しているとき、その版番号と理由 */
   rejection: { versionNo: number; reason: string | null } | null;
 };
@@ -38,6 +41,7 @@ export function ArticleEditor(props: Props) {
   const [title, setTitle] = useState(props.initialTitle);
   const [body, setBody] = useState(props.initialBody);
   const [tagsText, setTagsText] = useState(props.initialTags.join(" "));
+  const [showInitials, setShowInitials] = useState(props.initialShowInitials);
   const [articleId, setArticleId] = useState(props.articleId);
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
   const [previewHtml, setPreviewHtml] = useState("");
@@ -51,7 +55,7 @@ export function ArticleEditor(props: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // 保存処理は非同期に重なりうるので、最新の値と状態は ref でも持つ
-  const latest = useRef({ title, body, tagsText });
+  const latest = useRef({ title, body, tagsText, showInitials });
   const articleIdRef = useRef(articleId);
   const updatedAtRef = useRef(props.initialUpdatedAt);
   const savingRef = useRef(false);
@@ -60,14 +64,14 @@ export function ArticleEditor(props: Props) {
   const blockedRef = useRef(false);
 
   useEffect(() => {
-    latest.current = { title, body, tagsText };
-  }, [title, body, tagsText]);
+    latest.current = { title, body, tagsText, showInitials };
+  }, [title, body, tagsText, showInitials]);
 
   const tagList = tagsText.split(/[\s,、]+/).filter(Boolean);
 
   /** 1 回分の保存 */
   const saveOnce = useCallback(async (): Promise<void> => {
-    const { title, body, tagsText } = latest.current;
+    const { title, body, tagsText, showInitials } = latest.current;
     dirtyRef.current = false;
     setSaveState({ kind: "saving" });
     try {
@@ -76,6 +80,7 @@ export function ArticleEditor(props: Props) {
         title,
         bodyMd: body,
         tags: [tagsText],
+        showInitials,
         expectedUpdatedAt: updatedAtRef.current,
       });
       if (result.ok) {
@@ -174,7 +179,7 @@ export function ArticleEditor(props: Props) {
     if (!dirtyRef.current) return;
     const timer = setTimeout(() => void save(), AUTOSAVE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [title, body, tagsText, save]);
+  }, [title, body, tagsText, showInitials, save]);
 
   // プレビュー：サーバーで記事表示と同じ変換（サニタイズ込み）をかける
   useEffect(() => {
@@ -328,6 +333,25 @@ export function ArticleEditor(props: Props) {
             placeholder={`タグを空白区切りで ${MAX_TAGS} つまで（例：AWS Terraform 初心者向け）`}
             className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:border-brand focus:bg-surface focus:outline-none"
           />
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <label className={`flex items-center gap-2 ${props.myInitials ? "cursor-pointer" : "text-muted"}`}>
+              <input
+                type="checkbox"
+                checked={showInitials}
+                disabled={!props.myInitials && !showInitials}
+                onChange={(e) => {
+                  setShowInitials(e.target.checked);
+                  markDirty();
+                }}
+              />
+              著者名をイニシャル{props.myInitials ? `（${props.myInitials}）` : ""}で表示する
+            </label>
+            {!props.myInitials && (
+              <Link href="/me/settings" className="text-xs text-brand hover:underline">
+                イニシャルを登録する
+              </Link>
+            )}
+          </div>
           {tagList.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {tagList.map((t, i) => (

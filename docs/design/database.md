@@ -46,6 +46,7 @@ erDiagram
     text email UK
     text name
     enum department "dev | infra | null(未設定)"
+    text initials "イニシャル表示の表記(K.T.)"
     enum role "member | admin"
     timestamptz disabled_at
     timestamptz created_at
@@ -69,6 +70,7 @@ erDiagram
     text body_md
     enum status "draft|ai_review|admin_review|published|rejected|superseded"
     bool ai_check_failed "AIチェック未実施"
+    bool show_initials "著者名をイニシャルで表示"
     uuid based_on_version_id FK "差分の比較元"
     uuid created_by FK
     timestamptz submitted_at
@@ -250,4 +252,4 @@ CREATE TRIGGER audit_logs_no_update BEFORE UPDATE OR DELETE ON audit_logs
 
 - 新しい版はかならず `draft` で作る（INSERT 時に確認）
 - 状態は `docs/design/workflow.md` の遷移だけを許す（`draft → published` などの飛び越しは拒否）
-- 審査に出した版（`draft` 以外）は、タイトル・本文・タグを変更できず、削除もできない
+- 審査に出した版（`draft` 以外）は、タイトル・本文・タグ・イニシャル表示を変更できず、削除もできない

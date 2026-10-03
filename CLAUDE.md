@@ -143,6 +143,8 @@ npm run db:seed:dev         # 動作確認用の架空ユーザーと公開記�
 - 版の状態と記事の公開状態は `src/server/workflow/` だけで変える。DB のトリガーも不正な遷移・
   審査済みの版の変更・draft 以外での版の新規作成を拒否する（テストの準備は `tests/helpers/articles.ts`
   の `advanceVersion` で正規の順に進める）
+- 記事の著者を一般の画面に出すときは `toPublicAuthor()` を通す（イニシャル表示の記事で実名・ユーザー ID を
+  返さないため）。将来のユーザーページ・ランキング・通知でも、イニシャル表示の記事を実名にひもづけて見せない
 - 管理者向けの取得は `src/server/articles/admin-queries.ts`（ロールを関数の中でも確認する）
 - 記事の取得は `src/server/articles/queries.ts` を通す。Markdown の表示は `renderMarkdown()`
   （サニタイズ済みの `SanitizedHtml` を返す）だけを `dangerouslySetInnerHTML` に渡す

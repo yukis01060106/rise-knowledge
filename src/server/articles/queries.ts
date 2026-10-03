@@ -25,10 +25,11 @@ const visiblePublished = {
 const cardSelect = {
   id: true,
   firstPublishedAt: true,
-  author: { select: { id: true, name: true, department: true } },
+  author: { select: { name: true, initials: true, department: true } },
   publishedVersion: {
     select: {
       title: true,
+      showInitials: true,
       tags: { select: { tag: { select: { name: true, displayName: true } } } },
     },
   },
@@ -36,11 +37,24 @@ const cardSelect = {
 
 type CardRow = Prisma.ArticleGetPayload<{ select: typeof cardSelect }>;
 
+/**
+ * 画面に出す著者。イニシャル表示の版では実名を含めない（ほかの人に返すデータに実名・ユーザー ID を載せない）
+ */
+export type PublicAuthor = { name: string; department: Department | null; isInitials: boolean };
+
+export function toPublicAuthor(
+  author: { name: string | null; initials: string | null; department: Department | null },
+  showInitials: boolean,
+): PublicAuthor {
+  if (showInitials) return { name: author.initials ?? "イニシャル未設定", department: author.department, isInitials: true };
+  return { name: author.name ?? "名前未設定", department: author.department, isInitials: false };
+}
+
 export type ArticleCard = {
   id: string;
   title: string;
   firstPublishedAt: Date | null;
-  author: { id: string; name: string | null; department: Department | null };
+  author: PublicAuthor;
   tags: { name: string; displayName: string }[];
 };
 
@@ -49,7 +63,7 @@ function toCard(row: CardRow): ArticleCard {
     id: row.id,
     title: row.publishedVersion?.title ?? "",
     firstPublishedAt: row.firstPublishedAt,
-    author: row.author,
+    author: toPublicAuthor(row.author, row.publishedVersion?.showInitials ?? false),
     tags: row.publishedVersion?.tags.map((t) => t.tag) ?? [],
   };
 }
@@ -167,6 +181,7 @@ const versionSelect = {
   title: true,
   bodyMd: true,
   status: true,
+  showInitials: true,
   submittedAt: true,
   rejectReason: true,
   createdAt: true,
@@ -191,7 +206,7 @@ async function loadArticle(id: string) {
       authorId: true,
       firstPublishedAt: true,
       hiddenAt: true,
-      author: { select: { id: true, name: true, department: true } },
+      author: { select: { name: true, initials: true, department: true } },
       publishedVersion: { select: versionSelect },
       // 最新の版。作業中（draft / 審査中 / 差し戻し）かどうかは状態で判断する
       versions: { orderBy: { versionNo: "desc" }, select: versionSelect, take: 1 },
@@ -201,7 +216,8 @@ async function loadArticle(id: string) {
 
 export type ArticleDetail = {
   id: string;
-  author: { id: string; name: string | null; department: Department | null };
+  /** 表示する版（公開中の版。未公開なら著者にだけ作業中の版）に合わせた著者表示 */
+  author: PublicAuthor;
   firstPublishedAt: Date | null;
   hidden: boolean;
   /** 緊急非公開の理由（著者と admin にだけ返す） */
@@ -237,15 +253,17 @@ export async function getArticleDetail(viewer: Viewer, id: string): Promise<Arti
   if (!visible) return null;
 
   const latest = article.versions[0];
+  const working = isAuthor && latest && isWorkingStatus(latest.status) ? latest : null;
+  const shown = article.publishedVersion ?? working;
   return {
     id: article.id,
-    author: article.author,
+    author: toPublicAuthor(article.author, shown?.showInitials ?? false),
     firstPublishedAt: article.firstPublishedAt,
     hidden,
     hiddenReason: hidden ? await latestHiddenReason(article.id) : null,
     isAuthor,
     published: article.publishedVersion ? toVersionView(article.publishedVersion) : null,
-    working: isAuthor && latest && isWorkingStatus(latest.status) ? toVersionView(latest) : null,
+    working: working ? toVersionView(working) : null,
   };
 }
 

@@ -1,6 +1,6 @@
 import { diffStats, foldUnchanged, lineDiff } from "@/lib/diff";
 
-type Side = { title: string; bodyMd: string; tags: { name: string; displayName: string }[] };
+type Side = { title: string; bodyMd: string; tags: { name: string; displayName: string }[]; showInitials?: boolean };
 
 /** 2 つの版の差分（タイトル・タグ・本文）。比較元がないとき（初回公開）は呼ばない */
 export function DiffView({ before, after, beforeLabel, afterLabel }: { before: Side; after: Side; beforeLabel: string; afterLabel: string }) {
@@ -24,6 +24,12 @@ export function DiffView({ before, after, beforeLabel, afterLabel }: { before: S
           <p className="bg-red-50 px-3 py-1 text-red-900 line-through decoration-red-300">{before.title}</p>
           <p className="bg-emerald-50 px-3 py-1 text-emerald-900">{after.title}</p>
         </div>
+      )}
+      {Boolean(before.showInitials) !== Boolean(after.showInitials) && (
+        <p className="text-xs">
+          <span className="font-semibold">著者の表示：</span>
+          {before.showInitials ? "イニシャル" : "実名"} → <span className="font-semibold text-violet-800">{after.showInitials ? "イニシャル" : "実名"}</span>
+        </p>
       )}
       {(addedTags.length > 0 || removedTags.length > 0) && (
         <p className="flex flex-wrap gap-1.5">

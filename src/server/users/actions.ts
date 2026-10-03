@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db";
 import { requireAdmin, requireUser } from "@/server/auth/guards";
 import { writeAuditLog } from "@/server/audit/log";
+import { parseInitials } from "@/lib/initials";
 
 export type ActionState = { ok: boolean; message: string } | null;
 
@@ -19,6 +20,36 @@ export async function updateMyDepartment(_prev: ActionState, formData: FormData)
 
   await prisma.user.update({ where: { id: user.id }, data: { department: parsed.data.department } });
   redirect("/");
+}
+
+const settingsSchema = z.object({
+  department: z.enum(["dev", "infra"]),
+  initials: z.string().max(20),
+});
+
+/** 設定：自分の所属とイニシャル */
+export async function updateMySettings(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = settingsSchema.safeParse({
+    department: formData.get("department"),
+    initials: formData.get("initials") ?? "",
+  });
+  if (!parsed.success) return { ok: false, message: "入力が不正です" };
+
+  let initials: string | null = null;
+  if (parsed.data.initials.trim()) {
+    const result = parseInitials(parsed.data.initials);
+    if (!result.ok) return { ok: false, message: result.message };
+    initials = result.value;
+  } else {
+    // イニシャル表示の記事があるのに消すと、表示する名前がなくなる
+    const used = await prisma.articleVersion.count({ where: { createdBy: user.id, showInitials: true } });
+    if (used > 0) return { ok: false, message: "イニシャル表示の記事があるため、イニシャルは空にできません（変更はできます）" };
+  }
+
+  await prisma.user.update({ where: { id: user.id }, data: { department: parsed.data.department, initials } });
+  revalidatePath("/", "layout");
+  return { ok: true, message: initials ? `保存しました（イニシャル：${initials}）` : "保存しました" };
 }
 
 const roleSchema = z.object({
