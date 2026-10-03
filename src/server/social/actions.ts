@@ -11,6 +11,7 @@ import { blockingFindings, describePrescan, prescan } from "@/server/compliance/
 import { notifyAdminsOfFlaggedComment, notifyComment, notifyLike } from "@/server/notifications";
 import { normalizeTagName } from "@/lib/tags";
 import { MAX_COMMENT_LENGTH } from "@/lib/articles";
+import { RATE_LIMIT_MESSAGE, takeToken } from "@/server/rate-limit";
 
 export type SocialResult = { ok: true; message?: string } | { ok: false; message: string; details?: string[] };
 
@@ -28,6 +29,7 @@ async function visibleArticle(tx: Tx | typeof prisma, articleId: string) {
 /** いいね（もう一度押すと取り消し）。自分の記事にはできない */
 export async function toggleLike(articleId: string): Promise<SocialResult & { liked?: boolean; count?: number }> {
   const user = await requireUser();
+  if (!takeToken("like", user.id)) return { ok: false, message: RATE_LIMIT_MESSAGE };
   const article = await visibleArticle(prisma, articleId);
   if (!article) return { ok: false, message: "記事が見つかりません" };
   if (article.authorId === user.id) return { ok: false, message: "自分の記事にはいいねできません" };
@@ -80,6 +82,7 @@ const commentSchema = z.object({
  */
 export async function postComment(_prev: SocialResult | null, formData: FormData): Promise<SocialResult> {
   const user = await requireUser();
+  if (!takeToken("comment", user.id)) return { ok: false, message: RATE_LIMIT_MESSAGE };
   const parsed = commentSchema.safeParse({ articleId: formData.get("articleId"), body: formData.get("body") });
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "入力が不正です" };
   const { articleId, body } = parsed.data;

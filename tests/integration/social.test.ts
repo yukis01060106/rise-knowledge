@@ -262,3 +262,15 @@ describe("今週のトレンド・ユーザーページ", () => {
     expect(profile?.likeTotal).toBe(1);
   });
 });
+
+describe("レート制限（コメント）", () => {
+  it("短時間に投稿しすぎると止める", async () => {
+    const author = await createUser();
+    const { articleId } = await createPublishedArticle(author.id);
+    loginAs(author);
+    const results = [];
+    for (let i = 0; i < 12; i++) results.push(await postComment(null, form({ articleId, body: `コメント ${i}` })));
+    expect(results.filter((r) => r.ok)).toHaveLength(10);
+    expect(results.at(-1)).toMatchObject({ ok: false, message: expect.stringContaining("操作が多すぎます") });
+  });
+});

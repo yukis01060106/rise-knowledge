@@ -40,7 +40,19 @@ rise tech solutions 社内ナレッジ共有サイト（社内限定）。
 - 承認フロー：下書き → AI チェック → 管理者の確認 → 公開。自分の記事は承認できない。AI が自動で公開することはない
 - 公開後に編集しても、新しい版が承認されるまでは公開中の内容を表示し続ける
 - イニシャル表示での投稿（ほかの社員には実名を出さない）
+- AI チェック：申請時の事前スキャン（パスワード・API キー等で申請を止める）と Claude による審査。リスク高は自動差し戻し
+- いいね・ストック・コメント（コメントも AI チェック）、タグのフォロー、ユーザーページ
+- 通知（サイト内・Slack）、月間ランキング、月間ベストの表彰、管理者ダッシュボード
 - 監査ログ（追記のみ。変更・削除できない）、緊急非公開
+
+## ドキュメント
+
+| 読む人 | ドキュメント |
+|---|---|
+| 記事を書く人 | [投稿ガイドライン](docs/posting-guideline.md) |
+| 管理者 | [管理者ガイド](docs/admin-guide.md) |
+| サーバーの担当者 | [本番環境の構築と運用](docs/deploy.md) |
+| 開発者 | [CLAUDE.md](CLAUDE.md)（開発ルール）、[設計書](docs/design/)、[セキュリティ点検の結果](docs/security-review.md) |
 
 - 設計：[docs/design/](docs/design/)
 - 開発ルール・コマンド：[CLAUDE.md](CLAUDE.md)
@@ -54,6 +66,9 @@ npm install
 npx prisma migrate deploy
 npm run db:seed:dev     # 動作確認用の架空ユーザーと公開記事（開発用 DB のみ）
 npm run dev             # http://localhost:3000
+npm run worker          # ジョブのワーカー（COMPLIANCE_RUNNER=queue のとき）
+npm test                # 単体・結合テスト（.env.test のテスト用 DB）
+npm run test:e2e        # E2E テスト（ブラウザで操作。テスト用 DB を使う）
 ```
 
 DB は pg_bigm（日本語全文検索）が必要です。compose の db はビルド時に入れます。

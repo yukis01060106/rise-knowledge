@@ -129,6 +129,7 @@ npm run lint                # ESLint
 npm run admin:grant -- <email>   # 最初の admin を登録（有効な admin が 1 人もいないときだけ動く）
 npm run db:seed:dev         # 動作確認用の架空ユーザーと公開記事を作る（名前に dev を含む DB だけ）
 npm run worker              # ジョブのワーカー（AI チェック・Slack 通知）。COMPLIANCE_RUNNER=queue のとき必要
+npm run test:e2e            # E2E（Playwright）。テスト用 DB で開発サーバーを 3100 番に立てて操作する
 ```
 
 - `.env.test` には、名前に `test` を含むテスト用 DB を指定する（global-setup で確認している）
@@ -163,6 +164,11 @@ npm run worker              # ジョブのワーカー（AI チェック・Slack
   （サニタイズ済みの `SanitizedHtml` を返す）だけを `dangerouslySetInnerHTML` に渡す
 - 画像は `/api/images/[id]` でログインを確認してから配信する。Markdown の画像はこの URL だけを表示し、
   外部の画像は表示しない（社外へのアクセス・トラッキングを防ぐ）
+- 新しいページ・Server Action・Route Handler を足したら、`tests/unit/security-static.test.ts` が権限チェックの
+  抜け漏れを検出する。`dangerouslySetInnerHTML` を使うファイルを増やすときは同テストの許可リストに足し、理由をコメントする
+- レート制限は `src/server/rate-limit.ts`。セキュリティヘッダーは `src/lib/security-headers.ts`
+- 本番構成は `docs/deploy.md`（アプリ用 DB ロールは `scripts/sql/app-role.sql`、イメージは `docker/app/Dockerfile`）。
+  点検結果は `docs/security-review.md`
 - `demo/` は GitHub Pages で公開する操作デモ（CDN の Preact、データは架空で localStorage のみ）。本物のアプリの
   コード・データには一切つながない。クラスを変えたら `npm run demo:build` で `demo/styles.css` を書き出してコミットする。
   公開は `npm run demo:publish`（`demo/` を `gh-pages` ブランチに push し、GitHub Pages がそれを配信する）。

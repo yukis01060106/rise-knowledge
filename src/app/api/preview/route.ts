@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/server/auth/guards";
 import { renderMarkdown } from "@/server/markdown/render";
 import { MAX_BODY_LENGTH } from "@/lib/articles";
+import { takeToken } from "@/server/rate-limit";
 
 const schema = z.object({ markdown: z.string().max(MAX_BODY_LENGTH) });
 
@@ -13,6 +14,7 @@ const schema = z.object({ markdown: z.string().max(MAX_BODY_LENGTH) });
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!takeToken("preview", user.id)) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
 
   let body: unknown;
   try {

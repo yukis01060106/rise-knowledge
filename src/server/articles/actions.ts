@@ -9,6 +9,7 @@ import { parseTags } from "@/lib/tags";
 import { SUBMITTED_STATUSES } from "@/lib/labels";
 import { MAX_BODY_LENGTH, MAX_TITLE_LENGTH } from "@/lib/articles";
 import { CATEGORY_KEYS, parseFacets } from "@/lib/taxonomy";
+import { RATE_LIMIT_MESSAGE, takeToken } from "@/server/rate-limit";
 
 const saveSchema = z.object({
   articleId: z.uuid().nullable(),
@@ -28,7 +29,7 @@ export type SaveDraftInput = z.input<typeof saveSchema>;
 
 export type SaveDraftResult =
   | { ok: true; articleId: string; versionId: string; versionNo: number; updatedAt: string }
-  | { ok: false; code: "invalid" | "not_found" | "locked" | "conflict"; message: string };
+  | { ok: false; code: "invalid" | "not_found" | "locked" | "conflict" | "rate_limited"; message: string };
 
 const NOT_FOUND = { ok: false, code: "not_found", message: "記事が見つかりません" } as const;
 const CONFLICT = {
@@ -56,6 +57,7 @@ async function replaceTags(tx: Tx, versionId: string, tags: { name: string; disp
  */
 export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult> {
   const user = await requireUser();
+  if (!takeToken("saveDraft", user.id)) return { ok: false, code: "rate_limited", message: RATE_LIMIT_MESSAGE };
   const parsed = saveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "invalid", message: parsed.error.issues[0]?.message ?? "入力が不正です" };
   const tags = parseTags(parsed.data.tags);

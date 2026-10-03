@@ -20,6 +20,8 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }
 // AI チェックはテストから外部 API を呼ばない。既定は「問題なし（low）」を返す偽物（各テストで差し替えられる）
 process.env.COMPLIANCE_RUNNER = "inline";
 beforeEach(async () => {
+  const { resetRateLimits } = await import("@/server/rate-limit");
+  resetRateLimits();
   const { setComplianceDepsForTests } = await import("@/server/compliance");
   setComplianceDepsForTests({
     reviewer: { review: async () => ({ riskLevel: "low", summary: "問題は見当たりません", findings: [], model: "fake-model" }) },

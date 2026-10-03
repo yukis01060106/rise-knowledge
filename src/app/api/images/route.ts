@@ -4,11 +4,13 @@ import { getCurrentUser } from "@/server/auth/guards";
 import { prisma } from "@/server/db";
 import { getStorage } from "@/server/storage";
 import { checkImage, MAX_IMAGE_BYTES } from "@/server/images/validate";
+import { RATE_LIMIT_MESSAGE, takeToken } from "@/server/rate-limit";
 
 /** 画像のアップロード。記事エディタから multipart/form-data（file）で送る */
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!takeToken("imageUpload", user.id)) return NextResponse.json({ error: "rate_limited", message: RATE_LIMIT_MESSAGE }, { status: 429 });
 
   // 別サイトからのフォーム送信を拒否する
   const origin = request.headers.get("origin");

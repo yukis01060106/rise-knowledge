@@ -5,6 +5,7 @@ import { prisma } from "@/server/db";
 import { getEnv } from "@/server/env";
 import { isAllowedEmail } from "@/server/auth/allowlist";
 import { SESSION_MAX_AGE_SECONDS } from "@/server/auth/config";
+import { takeToken } from "@/server/rate-limit";
 
 /**
  * 開発・E2E テスト専用のログイン。SSO を使わずにセッションを作る。
@@ -20,6 +21,10 @@ export async function POST(request: NextRequest) {
   const env = getEnv();
   if (!env.AUTH_DEV_LOGIN || env.NODE_ENV === "production") {
     return new NextResponse(null, { status: 404 });
+  }
+
+  if (!takeToken("devLogin", request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local")) {
+    return new NextResponse(null, { status: 429 });
   }
 
   // 別サイトからのフォーム送信を拒否する

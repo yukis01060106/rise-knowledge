@@ -15,6 +15,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    exclude: ["tests/e2e/**", "node_modules/**"],
     globalSetup: ["tests/helpers/global-setup.ts"],
     setupFiles: ["tests/helpers/setup.ts"],
     // 統合テストは 1 つのテスト用 DB を共有するので、ファイルを並列に実行しない

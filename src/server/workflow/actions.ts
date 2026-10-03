@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireAdmin, requireUser } from "@/server/auth/guards";
 import { runComplianceCheck } from "@/server/compliance";
 import { describePrescan } from "@/server/compliance/prescan";
+import { RATE_LIMIT_MESSAGE, takeToken } from "@/server/rate-limit";
 import {
   approveVersion,
   discardDraft,
@@ -22,6 +23,7 @@ const id = z.uuid();
 /** レビュー申請（著者）。申請後に AI チェックを始める */
 export async function submitReviewAction(articleId: string): Promise<WorkflowActionState> {
   const user = await requireUser();
+  if (!takeToken("submitReview", user.id)) return { ok: false, message: RATE_LIMIT_MESSAGE };
   if (!id.safeParse(articleId).success) return { ok: false, message: "記事が見つかりません" };
   const result = await submitForReview(user, articleId);
   if (!result.ok) {

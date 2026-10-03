@@ -16,7 +16,8 @@
     "db:seed:dev": "tsx scripts/seed-dev.ts",
     "demo:publish": "npm run demo:build && git subtree split --prefix demo -b gh-pages && git push -f origin gh-pages && git branch -D gh-pages",
     "demo:build": "tsx scripts/build-demo-data.ts && tailwindcss -i demo/styles.src.css -o demo/styles.css --minify",
-    "worker": "tsx --conditions=react-server src/worker.ts"
+    "worker": "tsx --conditions=react-server src/worker.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
@@ -46,6 +47,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/cli": "^4.3.3",
     "@tailwindcss/postcss": "^4",
     "@types/hast": "^3.0.5",
