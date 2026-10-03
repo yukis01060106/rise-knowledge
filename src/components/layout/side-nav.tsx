@@ -26,6 +26,7 @@ const ICONS = {
   review: icon("M9 11l3 3 8-8M20 12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11"),
   manage: icon("M4 6h16M4 12h16M4 18h10"),
   audit: icon("M12 8v4l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z"),
+  about: icon("M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"),
   users: icon("M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1M9 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM22 19v-1a4 4 0 0 0-3-3.9M16 4.1a3 3 0 0 1 0 5.8"),
 };
 
@@ -42,6 +43,7 @@ function sections(isAdmin: boolean, pendingReviews: number): Section[] {
         },
         { href: "/tags", label: "タグ", icon: ICONS.tags, match: (p) => p.startsWith("/tags") },
         { href: "/search", label: "検索", icon: ICONS.search, match: (p) => p.startsWith("/search") },
+        { href: "/about", label: "理念・バリュー", icon: ICONS.about, match: (p) => p.startsWith("/about") },
       ],
     },
     {

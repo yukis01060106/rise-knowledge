@@ -33,9 +33,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <p className="text-4xl leading-tight font-bold tracking-tight xl:text-5xl">
             離れていても、
             <br />
-            ひとつのチーム。
+            ひとつのチーム！
           </p>
-          <p className="max-w-md text-white/85">学びを、仲間の武器にする。現場で得た知見を、客先で働く仲間へ届ける rise tech solutions の社内ナレッジ共有サイトです。</p>
+          <p className="max-w-md text-white/85">「学びを、仲間の武器にする！」現場で得た知見を、客先で働く仲間へ届ける rise tech solutions の社内ナレッジ共有サイトです。</p>
           <ul className="flex flex-wrap gap-2 text-sm">
             {["開発", "インフラ", "キャリア・働き方"].map((t) => (
               <li key={t} className="rounded-full bg-white/15 px-3 py-1 ring-1 ring-white/30">

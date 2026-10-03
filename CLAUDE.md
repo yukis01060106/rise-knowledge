@@ -147,6 +147,8 @@ npm run db:seed:dev         # 動作確認用の架空ユーザーと公開記�
   返さないため）。将来のユーザーページ・ランキング・通知でも、イニシャル表示の記事を実名にひもづけて見せない
 - 記事の分類（大分類・軸ごとの属性・自由タグ）は `src/lib/taxonomy.ts` が正。キーは変えない
   （docs/design/taxonomy.md）
+- 事業理念・ミッション・ビジョン・バリューの文言は `src/lib/philosophy.ts`。会社の資料のとおりに書き、言い換えない
+  （句読点も含む。例：バリューは「！」で終わる）
 - 見た目の定義（色・カード・分類ごとの色・記事本文）は `src/app/design.css`。本物とデモの両方が読み込む
 - 管理者向けの取得は `src/server/articles/admin-queries.ts`（ロールを関数の中でも確認する）
 - 記事の取得は `src/server/articles/queries.ts` を通す。Markdown の表示は `renderMarkdown()`

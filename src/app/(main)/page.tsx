@@ -5,6 +5,7 @@ import { ArticleCards, FeaturedArticle } from "@/components/articles/article-car
 import { CategoryIcon } from "@/components/ui/category-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CATEGORIES } from "@/lib/taxonomy";
+import { PHILOSOPHY } from "@/lib/philosophy";
 
 export default async function HomePage() {
   const user = await requireUser();
@@ -30,12 +31,12 @@ export default async function HomePage() {
           <h1 className="mt-2 text-3xl leading-tight font-bold tracking-tight sm:text-5xl">
             学びを、
             <br className="sm:hidden" />
-            仲間の武器にする。
+            仲間の武器にする！
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-white/85 sm:text-base">
             現場で得た知見やハマりどころを、離れて働く仲間へ。
             <br className="hidden sm:inline" />
-            離れていても、ひとつのチーム。
+            離れていても、ひとつのチーム！
           </p>
           <form action="/search" role="search" className="mt-6 flex max-w-lg gap-2 rounded-full bg-white/95 p-1.5 shadow-lg">
             <label htmlFor="hero-search" className="sr-only">
@@ -64,6 +65,33 @@ export default async function HomePage() {
             </span>
           </div>
         </div>
+      </section>
+
+      {/* バリュー */}
+      <section className="card relative overflow-hidden p-5 sm:p-6">
+        <span aria-hidden className="corner-wedge !size-16 opacity-70" />
+        <div className="relative flex flex-wrap items-center justify-between gap-3 pl-10">
+          <p className="text-sm font-bold">
+            <span className="brand-text mr-2 text-xl italic">Values</span>
+            {PHILOSOPHY.values.subject}
+          </p>
+          <Link href="/about" className="text-sm font-medium text-brand hover:underline">
+            理念・バリューを見る →
+          </Link>
+        </div>
+        <ol className="relative mt-4 flex flex-wrap gap-2">
+          {PHILOSOPHY.values.items.map((v) => (
+            <li
+              key={v.no}
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${
+                "here" in v ? "brand-gradient text-white shadow-sm" : "bg-background text-foreground"
+              }`}
+            >
+              <span className="mr-1.5 opacity-70">{v.no}</span>
+              {v.text}
+            </li>
+          ))}
+        </ol>
       </section>
 
       {/* 分類から探す */}

@@ -8,6 +8,8 @@ import { USERS, initialState } from "./data.js";
 
 // 分類の定義は本物のアプリ（src/lib/taxonomy.ts）から書き出したもの（npm run demo:build）
 const { COMMON_GROUPS, CATEGORIES } = await (await fetch("./taxonomy.json")).json();
+// 事業理念・ミッション・ビジョン・バリュー（src/lib/philosophy.ts から書き出したもの）
+const PHILOSOPHY = await (await fetch("./philosophy.json")).json();
 
 /* ───────── 保存（このブラウザの中だけ） ───────── */
 
@@ -350,8 +352,8 @@ function LoginPage({ onLogin }) {
           <span class="text-xl font-bold">rise ナレッジ</span>
         </div>
         <div class="relative space-y-6">
-          <p class="text-4xl leading-tight font-bold tracking-tight xl:text-5xl">離れていても、<br />ひとつのチーム。</p>
-          <p class="max-w-md text-white/85">学びを、仲間の武器にする。現場で得た知見を、客先で働く仲間へ届ける rise tech solutions の社内ナレッジ共有サイトです。</p>
+          <p class="text-4xl leading-tight font-bold tracking-tight xl:text-5xl">離れていても、<br />ひとつのチーム！</p>
+          <p class="max-w-md text-white/85">「学びを、仲間の武器にする！」現場で得た知見を、客先で働く仲間へ届ける rise tech solutions の社内ナレッジ共有サイトです。</p>
           <ul class="flex flex-wrap gap-2 text-sm">${CATEGORIES.map((c) => html`<li class="rounded-full bg-white/15 px-3 py-1 ring-1 ring-white/30">${c.label}</li>`)}</ul>
         </div>
         <p class="relative text-xs text-white/70">操作デモ版・データはすべて架空です</p>
@@ -409,8 +411,8 @@ function HomePage({ state, me }) {
         <span aria-hidden="true" class="absolute right-[12%] bottom-16 size-3 rounded-full bg-white/40"></span>
         <div class="relative max-w-2xl">
           <p class="text-sm font-medium text-white/80">ようこそ、${me.name.split(" ").pop()} さん</p>
-          <h1 class="mt-2 text-3xl leading-tight font-bold tracking-tight sm:text-5xl">学びを、<br class="sm:hidden" />仲間の武器にする。</h1>
-          <p class="mt-3 text-sm leading-relaxed text-white/85 sm:text-base">現場で得た知見やハマりどころを、離れて働く仲間へ。<br class="hidden sm:inline" />離れていても、ひとつのチーム。</p>
+          <h1 class="mt-2 text-3xl leading-tight font-bold tracking-tight sm:text-5xl">学びを、<br class="sm:hidden" />仲間の武器にする！</h1>
+          <p class="mt-3 text-sm leading-relaxed text-white/85 sm:text-base">現場で得た知見やハマりどころを、離れて働く仲間へ。<br class="hidden sm:inline" />離れていても、ひとつのチーム！</p>
           <form onSubmit=${(e) => (e.preventDefault(), go(`/search?q=${encodeURIComponent(q)}`))} class="mt-6 flex max-w-lg gap-2 rounded-full bg-white/95 p-1.5 shadow-lg">
             <input value=${q} onInput=${(e) => setQ(e.target.value)} type="search" placeholder="キーワードで探す（例：Terraform ロック）" class="min-w-0 flex-1 rounded-full bg-transparent px-4 text-sm text-foreground placeholder:text-gray-400 focus:outline-none" />
             <button class="brand-gradient rounded-full px-5 py-2 text-sm font-semibold text-white">検索</button>
@@ -421,6 +423,17 @@ function HomePage({ state, me }) {
             <span>あなたの下書き <strong class="text-lg">${counts.draft}</strong> 件</span>
           </div>
         </div>
+      </section>
+
+      <section class="card relative overflow-hidden p-5 sm:p-6">
+        <span aria-hidden="true" class="corner-wedge !size-16 opacity-70"></span>
+        <div class="relative flex flex-wrap items-center justify-between gap-3 pl-10">
+          <p class="text-sm font-bold"><span class="brand-text mr-2 text-xl italic">Values</span>${PHILOSOPHY.values.subject}</p>
+          <${Link} to="/about" class="text-sm font-medium text-brand hover:underline">理念・バリューを見る →<//>
+        </div>
+        <ol class="relative mt-4 flex flex-wrap gap-2">
+          ${PHILOSOPHY.values.items.map((v) => html`<li class=${`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${v.here ? "brand-gradient text-white shadow-sm" : "bg-background"}`}><span class="mr-1.5 opacity-70">${v.no}</span>${v.text}</li>`)}
+        </ol>
       </section>
 
       <section>
@@ -893,6 +906,68 @@ function SettingsPage({ state, me, actions }) {
   `;
 }
 
+/* ───────── 理念・バリュー ───────── */
+
+function Emphasize({ text, emphasis }) {
+  const i = text.indexOf(emphasis);
+  return i < 0 ? text : html`${text.slice(0, i)}<span class="swoosh">${emphasis}</span>${text.slice(i + emphasis.length)}`;
+}
+const PHeading = ({ en, ja, split }) => html`<div class="relative">
+  <p class="split-heading text-4xl font-light tracking-wide italic sm:text-5xl" style=${`--split:${split}`}>${en}</p>
+  <p class="mt-1 text-xs font-bold tracking-[0.3em] text-muted">${ja}</p>
+</div>`;
+
+function AboutPage() {
+  const { principle, mission, vision, values } = PHILOSOPHY;
+  return html`
+    <div class="space-y-10">
+      <section class="card paper relative overflow-hidden px-6 pt-24 pb-12 sm:px-14 sm:pt-28 sm:pb-16">
+        <span aria-hidden="true" class="corner-wedge"></span>
+        <h1 class="split-heading absolute top-5 left-6 text-4xl font-bold tracking-wider sm:left-10 sm:text-5xl" style="--split:44%">事業理念</h1>
+        <p class="relative space-y-3 text-2xl leading-relaxed sm:text-4xl sm:leading-relaxed">
+          ${principle.lines.map((line) => html`<span class="phrase block w-fit bg-white px-4 py-1.5"><${Emphasize} text=${line} emphasis=${principle.emphasis} /></span>`)}
+        </p>
+      </section>
+      <div class="grid gap-6 lg:grid-cols-2">
+        ${[
+          ["Mission", "ミッション", mission.lines, "ITとAIで解決する。", "28%"],
+          ["Vision", "ビジョン", vision.lines, "生まれる場所をツクる。", "30%"],
+        ].map(
+          ([en, ja, lines, underline, split]) => html`<section class="card paper relative overflow-hidden p-6 sm:p-10">
+            <span aria-hidden="true" class="corner-wedge !size-28"></span>
+            <${PHeading} en=${en} ja=${ja} split=${split} />
+            <p class="mt-8 space-y-2 text-xl leading-relaxed sm:text-2xl">
+              ${lines.map((line) => html`<span class="phrase block w-fit bg-white px-3 py-1">${line === underline ? html`<span class="swoosh">${line}</span>` : line}</span>`)}
+            </p>
+          </section>`,
+        )}
+      </div>
+      <section class="card paper relative overflow-hidden p-6 sm:p-10">
+        <span aria-hidden="true" class="corner-wedge !size-28"></span>
+        <div class="flex flex-wrap items-end gap-x-8 gap-y-3">
+          <${PHeading} en="Values" ja="バリュー" split="30%" />
+          <div class="text-sm leading-relaxed font-medium text-muted">${values.lead.map((l) => html`<p>${l}</p>`)}</div>
+        </div>
+        <p class="mt-8 text-lg font-semibold">${values.subject}</p>
+        <ol class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          ${values.items.map(
+            (v) => html`<li class="relative overflow-hidden rounded-2xl bg-white p-5 pr-14">
+              <span aria-hidden="true" class="brand-text absolute -top-3 right-3 text-7xl font-bold opacity-20">${v.no}</span>
+              <p class="text-xs font-bold text-brand">VALUE ${v.no}</p>
+              <p class="mt-1 text-lg font-bold">${v.text}</p>
+              ${v.here && html`<p class="mt-3 rounded-lg bg-surface px-3 py-2 text-xs leading-relaxed text-muted ring-1 ring-border"><span class="font-semibold text-brand">このサイトでは：</span>${v.here}</p>`}
+            </li>`,
+          )}
+        </ol>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <${Link} to="/articles/new" class=${btn() + " brand-gradient rounded-full px-5"}>学びを記事にする<//>
+          <${Link} to="/articles" class=${btn("secondary") + " rounded-full px-5"}>仲間の記事を読む<//>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
 /* ───────── 管理画面 ───────── */
 
 const AdminLabel = () => html`<p class="mb-3 inline-block rounded bg-foreground px-2 py-0.5 text-xs font-bold text-white">管理</p>`;
@@ -1151,6 +1226,7 @@ const ICONS = {
   review: "M9 11l3 3 8-8M20 12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11",
   manage: "M4 6h16M4 12h16M4 18h10",
   audit: "M12 8v4l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z",
+  about: "M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z",
 };
 
 function SideNav({ me, path, query, pending, onNavigate }) {
@@ -1161,6 +1237,7 @@ function SideNav({ me, path, query, pending, onNavigate }) {
         ["/articles", "記事", "articles", (p) => (p === "/articles" && !query.get("cat")) || /^\/articles\/[^/]+$/.test(p)],
         ["/tags", "タグ", "tags", (p) => p.startsWith("/tags")],
         ["/search", "検索", "search", (p) => p.startsWith("/search")],
+        ["/about", "理念・バリュー", "about", (p) => p.startsWith("/about")],
       ],
     },
     {
@@ -1418,6 +1495,7 @@ function App() {
   else if (p === "/articles/new") page = html`<${EditorPage} key="new" ...${props} id=${null} />`;
   else if ((m = p.match(/^\/articles\/([^/]+)\/edit$/))) page = html`<${EditorPage} key=${m[1]} ...${props} id=${m[1]} />`;
   else if ((m = p.match(/^\/articles\/([^/]+)$/))) page = html`<${ArticlePage} ...${props} id=${m[1]} />`;
+  else if (p === "/about") page = html`<${AboutPage} />`;
   else if (p === "/tags") page = html`<${TagsPage} ...${props} />`;
   else if ((m = p.match(/^\/tags\/(.+)$/))) page = html`<${TagPage} ...${props} name=${decodeURIComponent(m[1])} />`;
   else if (p === "/search") page = html`<${SearchPage} key=${route.query.get("q")} ...${props} />`;
