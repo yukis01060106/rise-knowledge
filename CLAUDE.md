@@ -150,5 +150,9 @@ npm run db:seed:dev         # 動作確認用の架空ユーザーと公開記�
   （サニタイズ済みの `SanitizedHtml` を返す）だけを `dangerouslySetInnerHTML` に渡す
 - 画像は `/api/images/[id]` でログインを確認してから配信する。Markdown の画像はこの URL だけを表示し、
   外部の画像は表示しない（社外へのアクセス・トラッキングを防ぐ）
+- `demo/` は GitHub Pages で公開する操作デモ（CDN の Preact、データは架空で localStorage のみ）。本物のアプリの
+  コード・データには一切つながない。クラスを変えたら `npm run demo:css` で `demo/styles.css` を書き出してコミットする。
+  公開は `npm run demo:publish`（`demo/` を `gh-pages` ブランチに push し、GitHub Pages がそれを配信する）。
+  画面の色（`src/app/globals.css` の `:root`）を変えたら `demo/styles.src.css` もそろえる
 - 認証：`src/server/auth/`。`getCurrentUser()` はロールを毎回 DB から読む。
   Server Action のテストでは `tests/helpers/auth.ts` の `loginAs()` で `auth()` を差し替える

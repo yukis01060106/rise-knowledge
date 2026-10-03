@@ -1,8 +1,8 @@
 import type { Department } from "@/generated/prisma/enums";
 
 const COLORS: Record<Department | "none", string> = {
-  dev: "bg-emerald-600",
-  infra: "bg-sky-600",
+  dev: "bg-brand",
+  infra: "bg-slate-500",
   none: "bg-gray-400",
 };
 

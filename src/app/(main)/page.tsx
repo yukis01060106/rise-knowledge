@@ -16,7 +16,7 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-8">
-      <section className="rounded-xl bg-gradient-to-br from-brand to-brand-strong px-6 py-8 text-white sm:px-8">
+      <section className="rounded-xl bg-gradient-to-br from-brand-light via-brand to-brand-strong px-6 py-8 text-white sm:px-8">
         <p className="text-sm opacity-80">ようこそ、{user.name ?? user.email} さん</p>
         <h1 className="mt-1 text-2xl font-bold sm:text-3xl">学びを、仲間の武器にする！</h1>
         <p className="mt-2 max-w-xl text-sm opacity-90">

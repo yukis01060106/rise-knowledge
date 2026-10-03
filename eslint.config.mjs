@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "src/generated/**",
+    // GitHub Pages の操作デモ（CDN の Preact で書いた静的ページ）。Next.js / React Compiler 向けのルールは当てはまらない
+    "demo/**",
   ]),
 ]);
 

@@ -1,19 +1,7 @@
-@import "tailwindcss";
-
-:root {
-  --background: #f4f6f9;
-  --foreground: #1f2328;
-  --surface: #ffffff;
-  --muted: #5c6670;
-  --border: #e1e5ea;
-  /* ロゴの青（濃い青・青・水色）から取った色 */
-  --brand: #0068b7;
-  --brand-strong: #00479d;
-  --brand-light: #00a0e9;
-  --brand-soft: #e6f1fb;
-  --accent: #f2a33a;
-  --danger: #b42318;
-}
+/* デモ版のスタイル。`npm run demo:css` で styles.css を書き出す（本物のアプリと同じ色・記事本文のスタイル） */
+@import "tailwindcss" source(none);
+@source "./app.js";
+@source "./index.html";
 
 @theme inline {
   --color-background: var(--background);
@@ -29,13 +17,28 @@
   --color-danger: var(--danger);
 }
 
+:root {
+  --background: #f4f6f9;
+  --foreground: #1f2328;
+  --surface: #ffffff;
+  --muted: #5c6670;
+  --border: #e1e5ea;
+  /* ロゴの青（濃い青・青・水色）から取った色 */
+  --brand: #0068b7;
+  --brand-strong: #00479d;
+  --brand-light: #00a0e9;
+  --brand-soft: #e6f1fb;
+  --accent: #f2a33a;
+  --danger: #b42318;
+}
 body {
   background: var(--background);
   color: var(--foreground);
-  /* 社内ネットワークから外部フォントを読まずに済むよう、OS のフォントを使う */
   font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
-
+.markdown-body pre code.hljs { background: transparent; padding: 0; }
+#loading { display: flex; min-height: 100vh; align-items: center; justify-content: center; color: var(--muted); }
 /* 記事本文（renderMarkdown の出力）。プレビューと記事詳細で共通 */
 .markdown-body {
   line-height: 1.85;
