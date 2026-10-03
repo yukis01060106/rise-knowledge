@@ -1,4 +1,4 @@
-// rise ナレッジ デモ版。本物のアプリ（Next.js）とは別物で、架空のデータをブラウザの中（localStorage）だけで扱う。
+// ライズ・ナレッジ デモ版。本物のアプリ（Next.js）とは別物で、架空のデータをブラウザの中（localStorage）だけで扱う。
 // 承認フローの決まり（自分の記事は承認できない、公開後の編集は新しい版を作る など）は本物に合わせている。
 import { html, render, useState, useEffect, useRef, useMemo } from "https://cdn.jsdelivr.net/npm/htm@3/preact/standalone.module.js";
 import { marked } from "https://cdn.jsdelivr.net/npm/marked@15/lib/marked.esm.js";
@@ -349,7 +349,7 @@ function LoginPage({ onLogin }) {
         <span aria-hidden="true" class="orbit orbit-spin -right-40 -bottom-56 size-[30rem] border-r-transparent border-b-white/40 [animation-duration:70s]"></span>
         <div class="relative flex items-center gap-3">
           <span class="rounded-2xl bg-white p-2 shadow-lg"><img src="logo.png" alt="" width="40" height="38" /></span>
-          <span class="text-xl font-bold">rise ナレッジ</span>
+          <span class="text-xl font-bold">ライズ・ナレッジ</span>
         </div>
         <div class="relative space-y-6">
           <p class="text-4xl leading-tight font-bold tracking-tight xl:text-5xl">離れていても、<br />ひとつのチーム！</p>
@@ -362,7 +362,7 @@ function LoginPage({ onLogin }) {
         <div class="mx-auto w-full max-w-sm space-y-6">
           <div class="text-center lg:text-left">
             <img src="logo.png" alt="rise tech solutions" width="68" height="64" class="mx-auto mb-4 lg:hidden" />
-            <h1 class="text-2xl font-bold tracking-tight">rise ナレッジ <span class="brand-text">操作デモ</span></h1>
+            <h1 class="text-2xl font-bold tracking-tight">ライズ・ナレッジ <span class="brand-text">操作デモ</span></h1>
             <p class="mt-1 text-sm text-muted">データは架空で、このブラウザの中だけに保存されます。</p>
           </div>
           <div class="space-y-2">
@@ -1307,7 +1307,7 @@ function Shell({ state, me, route, actions, children }) {
       </div>
       <header class="glass sticky top-0 z-20 border-b border-white/60 shadow-[0_1px_0_rgb(15_35_70/0.06)]">
         <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5">
-          <${Link} to="/" class="flex items-center gap-2 font-bold text-brand-strong"><img src="logo.png" alt="" width="30" height="28" /><span class="brand-text hidden text-lg tracking-tight sm:inline">rise ナレッジ</span><//>
+          <${Link} to="/" class="flex items-center gap-2 font-bold text-brand-strong"><img src="logo.png" alt="" width="30" height="28" /><span class="brand-text hidden text-lg tracking-tight sm:inline">ライズ・ナレッジ</span><//>
           <form onSubmit=${search} class="ml-auto hidden w-72 md:block">
             <input value=${q} onInput=${(e) => setQ(e.target.value)} type="search" placeholder="記事を検索" class="w-full rounded-full border border-border bg-surface/80 px-4 py-1.5 text-sm focus:border-brand focus:bg-surface focus:outline-none" />
           </form>
