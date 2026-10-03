@@ -25,8 +25,19 @@ enum ActorType {
   system
 }
 
+// 記事の版の状態（docs/design/database.md）。状態の変更は src/server/workflow/ だけで行う
+enum VersionStatus {
+  draft
+  ai_review
+  admin_review
+  published
+  rejected
+  superseded
+}
+
 // 監査ログの操作種別。フェーズが進むごとに追加する（docs/design/database.md）
 enum AuditAction {
+  version_created
   role_changed
   user_disabled
   user_enabled
@@ -48,10 +59,110 @@ model User {
 
   accounts          Account[]
   sessions          Session[]
-  auditLogsAsActor  AuditLog[] @relation("AuditActor")
-  auditLogsAsTarget AuditLog[] @relation("AuditTargetUser")
+  articles          Article[]        @relation("ArticleAuthor")
+  hiddenArticles    Article[]        @relation("ArticleHiddenBy")
+  createdVersions   ArticleVersion[] @relation("VersionCreatedBy")
+  decidedVersions   ArticleVersion[] @relation("VersionDecidedBy")
+  images            Image[]
+  auditLogsAsActor  AuditLog[]       @relation("AuditActor")
+  auditLogsAsTarget AuditLog[]       @relation("AuditTargetUser")
 
   @@map("users")
+}
+
+// 記事。本文は版（ArticleVersion）に持ち、記事は「公開中の版」を指すだけ
+model Article {
+  id                 String    @id @default(uuid()) @db.Uuid
+  authorId           String    @map("author_id") @db.Uuid
+  publishedVersionId String?   @unique @map("published_version_id") @db.Uuid
+  firstPublishedAt   DateTime? @map("first_published_at") @db.Timestamptz
+  // 緊急非公開（フェーズ3）。公開中の版はそのまま残す
+  hiddenAt           DateTime? @map("hidden_at") @db.Timestamptz
+  hiddenBy           String?   @map("hidden_by") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  author           User             @relation("ArticleAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  hiddenByUser     User?            @relation("ArticleHiddenBy", fields: [hiddenBy], references: [id], onDelete: Restrict)
+  publishedVersion ArticleVersion?  @relation("PublishedVersion", fields: [publishedVersionId], references: [id], onDelete: Restrict)
+  versions         ArticleVersion[] @relation("ArticleVersions")
+
+  @@index([authorId, updatedAt(sort: Desc)])
+  @@map("articles")
+}
+
+// 記事の版。審査に出した版（ai_review 以降）は内容を変更しない
+model ArticleVersion {
+  id               String        @id @default(uuid()) @db.Uuid
+  articleId        String        @map("article_id") @db.Uuid
+  versionNo        Int           @map("version_no")
+  title            String
+  bodyMd           String        @map("body_md")
+  status           VersionStatus @default(draft)
+  aiCheckFailed    Boolean       @default(false) @map("ai_check_failed")
+  basedOnVersionId String?       @map("based_on_version_id") @db.Uuid
+  createdBy        String        @map("created_by") @db.Uuid
+  submittedAt      DateTime?     @map("submitted_at") @db.Timestamptz
+  decidedAt        DateTime?     @map("decided_at") @db.Timestamptz
+  decidedBy        String?       @map("decided_by") @db.Uuid
+  rejectReason     String?       @map("reject_reason")
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  article         Article          @relation("ArticleVersions", fields: [articleId], references: [id], onDelete: Restrict)
+  publishedOf     Article?         @relation("PublishedVersion")
+  basedOn         ArticleVersion?  @relation("VersionBasedOn", fields: [basedOnVersionId], references: [id], onDelete: Restrict)
+  derivedVersions ArticleVersion[] @relation("VersionBasedOn")
+  creator         User             @relation("VersionCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  decider         User?            @relation("VersionDecidedBy", fields: [decidedBy], references: [id], onDelete: Restrict)
+  tags            VersionTag[]
+
+  // 部分インデックス（作業中の版は 1 記事 1 つ、レビュー待ち）と全文検索の lower() 式インデックスは
+  // マイグレーション SQL で作る（Prisma は式インデックスを無視するので消されない）
+  @@unique([articleId, versionNo])
+  @@index([submittedAt])
+  @@map("article_versions")
+}
+
+// タグ。name は正規化済み（NFKC・小文字）、display_name は最初に使われた表記
+model Tag {
+  id          String       @id @default(uuid()) @db.Uuid
+  name        String       @unique
+  displayName String       @map("display_name")
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  versions    VersionTag[]
+
+  @@index([name(ops: raw("gin_bigm_ops"))], map: "tags_name_bigm_idx", type: Gin)
+  @@map("tags")
+}
+
+model VersionTag {
+  versionId String @map("version_id") @db.Uuid
+  tagId     String @map("tag_id") @db.Uuid
+
+  version ArticleVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  tag     Tag            @relation(fields: [tagId], references: [id], onDelete: Restrict)
+
+  @@id([versionId, tagId])
+  @@index([tagId, versionId])
+  @@map("version_tags")
+}
+
+// アップロード画像。配信はアプリ経由（/api/images/[id]）でログインを確認する
+model Image {
+  id         String   @id @default(uuid()) @db.Uuid
+  uploaderId String   @map("uploader_id") @db.Uuid
+  storageKey String   @unique @map("storage_key")
+  mimeType   String   @map("mime_type")
+  sizeBytes  Int      @map("size_bytes")
+  width      Int
+  height     Int
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  uploader User @relation(fields: [uploaderId], references: [id], onDelete: Restrict)
+
+  @@index([uploaderId, createdAt])
+  @@map("images")
 }
 
 // Auth.js（@auth/prisma-adapter）が使うテーブル

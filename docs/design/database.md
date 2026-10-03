@@ -214,7 +214,7 @@ erDiagram
 | article_versions | `UNIQUE (article_id, version_no)` | 版番号 |
 | article_versions | `UNIQUE (article_id) WHERE status IN ('draft','ai_review','admin_review','rejected')` | 作業中の版は 1 記事 1 つ |
 | article_versions | `(submitted_at) WHERE status = 'admin_review'` | レビュー待ち一覧（申請日時順） |
-| article_versions | `GIN (title gin_bigm_ops)`、`GIN (body_md gin_bigm_ops)` | 日本語全文検索（公開版を join して絞る） |
+| article_versions | `GIN (lower(title) gin_bigm_ops)`、`GIN (lower(body_md) gin_bigm_ops)` | 日本語全文検索（公開版を join して絞る）。pg_bigm は LIKE にしか効かないため、英字の大文字・小文字を区別しないよう `lower()` の式インデックスにする |
 | tags | `UNIQUE (name)`、`GIN (name gin_bigm_ops)` | タグ候補の部分一致 |
 | version_tags | `(tag_id, version_id)` | タグ別一覧 |
 | likes / stocks | PK `(user_id, article_id)` + `(article_id, created_at)` | 重複防止、週間・月間集計 |

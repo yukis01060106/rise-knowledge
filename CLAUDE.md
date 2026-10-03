@@ -61,6 +61,10 @@ src/
     compliance/        # 事前スキャン、LLM チェック
     audit/             # 監査ログ書き込み（追記のみ）
     db.ts              # Prisma クライアント
+    articles/          # 記事の取得（閲覧権限の判定）と下書き保存
+    markdown/          # Markdown → サニタイズ済み HTML（プレビューと表示で共通）
+    storage/           # 画像の保存先（S3 互換 / ローカルディスク）
+  components/          # 画面の共通部品（ui/ は見た目だけの部品）
   lib/                 # クライアント・サーバー共用の純粋関数
 prompts/               # LLM のシステムプロンプト（compliance_check.md など）
 config/                # モデル名・リスクしきい値などの設定
@@ -123,6 +127,7 @@ npm test                    # Vitest（.env.test の DB を使う。各テスト
 npm run typecheck           # 型チェック
 npm run lint                # ESLint
 npm run admin:grant -- <email>   # 最初の admin を登録（有効な admin が 1 人もいないときだけ動く）
+npm run db:seed:dev         # 動作確認用の架空ユーザーと公開記事を作る（名前に dev を含む DB だけ）
 ```
 
 - `.env.test` には、名前に `test` を含むテスト用 DB を指定する（global-setup で確認している）
@@ -130,5 +135,14 @@ npm run admin:grant -- <email>   # 最初の admin を登録（有効な admin �
   （Prisma 側でも止められる）。必要なときは人間に依頼する
 - 監査ログのトリガーなど、Prisma スキーマで表せない DB の定義はマイグレーション SQL に追記する
 - Next.js 16 では middleware ではなく `src/proxy.ts`。proxy はセッション Cookie の有無しか見ない
+- DB には pg_bigm が必要（compose の db はビルド時に入れる。ローカルの入れ方は README）
+- 全文検索は `lower(列) LIKE likequery(lower(語))` で書く（pg_bigm の索引は LIKE にしか効かないため、
+  `lower()` の式インデックスを張っている。Prisma は式インデックスを無視するので消されない）
+- 部分インデックスなど Prisma で表せない索引を足したら、`prisma migrate diff --from-config-datasource
+  --to-schema prisma/schema.prisma --script` が空になることを確認する
+- 記事の取得は `src/server/articles/queries.ts` を通す。Markdown の表示は `renderMarkdown()`
+  （サニタイズ済みの `SanitizedHtml` を返す）だけを `dangerouslySetInnerHTML` に渡す
+- 画像は `/api/images/[id]` でログインを確認してから配信する。Markdown の画像はこの URL だけを表示し、
+  外部の画像は表示しない（社外へのアクセス・トラッキングを防ぐ）
 - 認証：`src/server/auth/`。`getCurrentUser()` はロールを毎回 DB から読む。
   Server Action のテストでは `tests/helpers/auth.ts` の `loginAs()` で `auth()` を差し替える

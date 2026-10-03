@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/server/auth/guards";
 import { prisma } from "@/server/db";
 import { DEPARTMENT_LABELS } from "@/lib/labels";
+import { PageHeader } from "@/components/ui/page-header";
 import { UserRowActions } from "./user-row-actions";
 
 export default async function AdminUsersPage() {
@@ -11,32 +12,32 @@ export default async function AdminUsersPage() {
   });
 
   return (
-    <section className="space-y-4">
-      <h1 className="text-xl font-bold">ユーザー管理</h1>
-      <p className="text-sm text-gray-600">
-        ロールの変更と無効化は監査ログに記録されます。自分自身のロールは変更できません。
-      </p>
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse bg-white text-sm">
+    <section>
+      <PageHeader
+        title="ユーザー管理"
+        description="ロールの変更と無効化は監査ログに記録されます。自分自身のロールは変更できません。"
+      />
+      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+        <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b text-left">
-              <th className="p-2">名前</th>
-              <th className="p-2">メール</th>
-              <th className="p-2">所属</th>
-              <th className="p-2">最終ログイン</th>
-              <th className="p-2">操作</th>
+            <tr className="border-b border-border bg-background text-left text-xs text-muted">
+              <th className="px-3 py-2">名前</th>
+              <th className="px-3 py-2">メール</th>
+              <th className="px-3 py-2">所属</th>
+              <th className="px-3 py-2">最終ログイン</th>
+              <th className="px-3 py-2">操作</th>
             </tr>
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr key={u.id} className={`border-b ${u.disabledAt ? "text-gray-400" : ""}`}>
-                <td className="p-2">{u.name ?? "-"}</td>
-                <td className="p-2">{u.email}</td>
-                <td className="p-2">{u.department ? DEPARTMENT_LABELS[u.department] : "未設定"}</td>
-                <td className="p-2">
+              <tr key={u.id} className={`border-b border-border last:border-0 ${u.disabledAt ? "text-gray-400" : ""}`}>
+                <td className="px-3 py-2">{u.name ?? "-"}</td>
+                <td className="px-3 py-2">{u.email}</td>
+                <td className="px-3 py-2">{u.department ? DEPARTMENT_LABELS[u.department] : "未設定"}</td>
+                <td className="px-3 py-2">
                   {u.lastLoginAt?.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }) ?? "-"}
                 </td>
-                <td className="p-2">
+                <td className="px-3 py-2">
                   <UserRowActions
                     userId={u.id}
                     role={u.role}

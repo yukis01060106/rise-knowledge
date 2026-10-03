@@ -24,6 +24,19 @@ describe("環境変数の検証", () => {
     expect(() => getEnv()).toThrow(/テナント/);
   });
 
+  it("本番で画像をローカルディスクに保存する設定は拒否する", () => {
+    Object.assign(process.env, { NODE_ENV: "production", AUTH_DEV_LOGIN: "false", STORAGE_DRIVER: "local" });
+    resetEnvCache();
+    expect(() => getEnv()).toThrow(/STORAGE_DRIVER=s3/);
+  });
+
+  it("S3 を使うときはバケット名が必要", () => {
+    Object.assign(process.env, { STORAGE_DRIVER: "s3" });
+    delete process.env.S3_BUCKET;
+    resetEnvCache();
+    expect(() => getEnv()).toThrow(/S3_BUCKET/);
+  });
+
   it("エラーメッセージに秘密情報の値を含めない", () => {
     Object.assign(process.env, { AUTH_SECRET: "super-secret-value", AUTH_PROVIDER: "unknown" });
     resetEnvCache();

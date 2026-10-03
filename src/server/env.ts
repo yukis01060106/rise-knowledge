@@ -27,10 +27,29 @@ const schema = z
       .enum(["true", "false"])
       .default("false")
       .transform((v) => v === "true"),
+    // 画像の保存先。s3 = S3 互換ストレージ（本番・MinIO）、local = ディスク（ローカル開発・テストのみ）
+    STORAGE_DRIVER: z.enum(["s3", "local"]).default("local"),
+    STORAGE_LOCAL_DIR: z.string().min(1).default(".data/uploads"),
+    S3_ENDPOINT: z.string().optional(),
+    S3_REGION: z.string().default("ap-northeast-1"),
+    S3_BUCKET: z.string().optional(),
+    S3_ACCESS_KEY_ID: z.string().optional(),
+    S3_SECRET_ACCESS_KEY: z.string().optional(),
+    S3_FORCE_PATH_STYLE: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((v) => v === "true"),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production" && env.AUTH_DEV_LOGIN) {
       ctx.addIssue({ code: "custom", message: "本番環境では AUTH_DEV_LOGIN を有効にできません" });
+    }
+    if (env.NODE_ENV === "production" && env.STORAGE_DRIVER === "local") {
+      // アプリサーバーをステートレスに保つ（台数を増やしても画像が見える）ため
+      ctx.addIssue({ code: "custom", message: "本番環境では STORAGE_DRIVER=s3 を指定してください" });
+    }
+    if (env.STORAGE_DRIVER === "s3" && !env.S3_BUCKET) {
+      ctx.addIssue({ code: "custom", message: "STORAGE_DRIVER=s3 のときは S3_BUCKET を指定してください" });
     }
     if (
       env.AUTH_PROVIDER === "microsoft-entra-id" &&

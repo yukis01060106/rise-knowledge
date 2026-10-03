@@ -17,3 +17,6 @@ test-results/
 *.tsbuildinfo
 next-env.d.ts
 .next-*
+
+# ローカル開発の画像置き場（STORAGE_DRIVER=local）
+/.data

@@ -1,7 +1,8 @@
 # 開発環境用。本番の構成はフェーズ7で docs/deploy.md にまとめる。
 services:
   db:
-    image: postgres:16
+    # pg_bigm（日本語全文検索）入りの PostgreSQL 16
+    build: docker/db
     environment:
       # ローカル開発専用の値。本番では使わない
       POSTGRES_USER: postgres
@@ -24,6 +25,13 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/rise_knowledge_dev
+      # 画像は MinIO（S3 互換）に保存する
+      STORAGE_DRIVER: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: rise-knowledge-dev
+      S3_ACCESS_KEY_ID: minioadmin
+      S3_SECRET_ACCESS_KEY: minioadmin
+      S3_FORCE_PATH_STYLE: "true"
     ports:
       - "3000:3000"
     volumes:
@@ -32,8 +40,39 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     command: sh -c "npx prisma migrate deploy && npm run dev -- --hostname 0.0.0.0"
+
+  # 画像の保存先（S3 互換）。管理画面は http://localhost:9001
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      # ローカル開発専用の値。本番では使わない
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      retries: 10
+
+  # バケットを作る（非公開のまま。画像はアプリ経由で配信する）
+  minio-init:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "mc alias set local http://minio:9000 minioadmin minioadmin &&
+             mc mb --ignore-existing local/rise-knowledge-dev"
 
 volumes:
   db-data:
+  minio-data:
   node_modules:

@@ -12,7 +12,7 @@ export function DepartmentForm() {
       <fieldset className="space-y-2">
         <legend className="sr-only">所属部署</legend>
         {Object.entries(DEPARTMENT_LABELS).map(([value, label]) => (
-          <label key={value} className="flex items-center gap-2 rounded border bg-white p-3">
+          <label key={value} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface p-3 has-checked:border-brand has-checked:bg-brand-soft">
             <input type="radio" name="department" value={value} required />
             {label}
           </label>
@@ -22,7 +22,7 @@ export function DepartmentForm() {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded bg-emerald-700 px-4 py-2 font-semibold text-white disabled:opacity-50"
+        className="w-full rounded-md bg-brand px-4 py-2 font-semibold text-white hover:bg-brand-strong disabled:opacity-50"
       >
         はじめる
       </button>
