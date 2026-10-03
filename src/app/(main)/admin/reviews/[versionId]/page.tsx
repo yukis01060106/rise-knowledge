@@ -7,6 +7,8 @@ import { DiffView } from "@/components/articles/diff-view";
 import { Avatar } from "@/components/ui/avatar";
 import { DepartmentBadge } from "@/components/ui/department-badge";
 import { TagChip } from "@/components/ui/tag-chip";
+import { CategoryBadge } from "@/components/ui/category-badge";
+import { describeFacets } from "@/lib/taxonomy";
 import { formatDateTime } from "@/lib/format";
 import { VERSION_STATUS_LABELS } from "@/lib/labels";
 import { ReviewActions } from "./review-actions";
@@ -39,13 +41,17 @@ export default async function ReviewPage({ params }: PageProps<"/admin/reviews/[
             <span>v{version.versionNo}</span>
             <span>申請 {formatDateTime(version.submittedAt)}</span>
           </div>
-          {version.tags.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {version.tags.map((t) => (
-                <TagChip key={t.name} {...t} />
-              ))}
-            </div>
-          )}
+          <div className={`cat-${version.category ?? "dev"} mt-3 flex flex-wrap items-center gap-1.5`}>
+            {version.category ? <CategoryBadge category={version.category} /> : <span className="text-xs text-danger">大分類なし</span>}
+            {describeFacets(version.category, version.facets).map((f) => (
+              <span key={f.key} className="cat-soft rounded-md px-2 py-0.5 text-xs font-medium">
+                {f.groupLabel}：{f.label}
+              </span>
+            ))}
+            {version.tags.map((t) => (
+              <TagChip key={t.name} {...t} />
+            ))}
+          </div>
         </div>
 
         {version.aiCheckFailed && (

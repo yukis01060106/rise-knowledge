@@ -8,6 +8,8 @@ import { discardDraftAction, submitReviewAction } from "@/server/workflow/action
 import { buttonClass } from "@/components/ui/button";
 import { ARTICLE_TEMPLATES, MAX_BODY_LENGTH, MAX_TITLE_LENGTH } from "@/lib/articles";
 import { MAX_TAGS } from "@/lib/tags";
+import { CATEGORIES, facetKey, groupsFor, type CategoryKey } from "@/lib/taxonomy";
+import { CategoryIcon } from "@/components/ui/category-badge";
 
 type Props = {
   articleId: string | null;
@@ -19,6 +21,8 @@ type Props = {
   /** 公開済みの記事を編集しているか（保存すると新しい版になる） */
   editingPublished: boolean;
   initialShowInitials: boolean;
+  initialCategory: CategoryKey | null;
+  initialFacets: string[];
   /** 設定画面で登録したイニシャル（未登録なら null） */
   myInitials: string | null;
   /** 差し戻された版を修正しているとき、その版番号と理由 */
@@ -42,6 +46,8 @@ export function ArticleEditor(props: Props) {
   const [body, setBody] = useState(props.initialBody);
   const [tagsText, setTagsText] = useState(props.initialTags.join(" "));
   const [showInitials, setShowInitials] = useState(props.initialShowInitials);
+  const [category, setCategory] = useState<CategoryKey | null>(props.initialCategory);
+  const [facets, setFacets] = useState<string[]>(props.initialFacets);
   const [articleId, setArticleId] = useState(props.articleId);
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
   const [previewHtml, setPreviewHtml] = useState("");
@@ -55,7 +61,7 @@ export function ArticleEditor(props: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // 保存処理は非同期に重なりうるので、最新の値と状態は ref でも持つ
-  const latest = useRef({ title, body, tagsText, showInitials });
+  const latest = useRef({ title, body, tagsText, showInitials, category, facets });
   const articleIdRef = useRef(articleId);
   const updatedAtRef = useRef(props.initialUpdatedAt);
   const savingRef = useRef(false);
@@ -64,14 +70,14 @@ export function ArticleEditor(props: Props) {
   const blockedRef = useRef(false);
 
   useEffect(() => {
-    latest.current = { title, body, tagsText, showInitials };
-  }, [title, body, tagsText, showInitials]);
+    latest.current = { title, body, tagsText, showInitials, category, facets };
+  }, [title, body, tagsText, showInitials, category, facets]);
 
   const tagList = tagsText.split(/[\s,、]+/).filter(Boolean);
 
   /** 1 回分の保存 */
   const saveOnce = useCallback(async (): Promise<void> => {
-    const { title, body, tagsText, showInitials } = latest.current;
+    const { title, body, tagsText, showInitials, category, facets } = latest.current;
     dirtyRef.current = false;
     setSaveState({ kind: "saving" });
     try {
@@ -81,6 +87,8 @@ export function ArticleEditor(props: Props) {
         bodyMd: body,
         tags: [tagsText],
         showInitials,
+        category,
+        facets,
         expectedUpdatedAt: updatedAtRef.current,
       });
       if (result.ok) {
@@ -179,7 +187,7 @@ export function ArticleEditor(props: Props) {
     if (!dirtyRef.current) return;
     const timer = setTimeout(() => void save(), AUTOSAVE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [title, body, tagsText, showInitials, save]);
+  }, [title, body, tagsText, showInitials, category, facets, save]);
 
   // プレビュー：サーバーで記事表示と同じ変換（サニタイズ込み）をかける
   useEffect(() => {
@@ -361,6 +369,74 @@ export function ArticleEditor(props: Props) {
                 >
                   #{t}
                 </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 分類：大分類（必須）と属性（任意）。審査の対象になる */}
+        <div className="space-y-3 border-b border-border bg-background/60 p-4">
+          <div>
+            <p className="mb-2 text-xs font-bold text-muted">
+              大分類 <span className="text-danger">*</span>
+              <span className="ml-1 font-normal">（申請に必要）</span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORIES.map((c) => {
+                const on = category === c.key;
+                return (
+                  <button
+                    key={c.key}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => {
+                      // 大分類を変えたら、その分類で選べない属性は外す
+                      const allowed = new Set(groupsFor(c.key).flatMap((g) => g.options.map((o) => facetKey(g.key, o.key))));
+                      setCategory(c.key);
+                      setFacets((fs) => fs.filter((f) => allowed.has(f)));
+                      markDirty();
+                    }}
+                    className={`cat-${c.key} inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+                      on ? "cat-gradient text-white shadow" : "bg-surface ring-1 ring-border hover:ring-[var(--cat-from)]"
+                    }`}
+                  >
+                    <CategoryIcon category={c.key} className={`size-4 ${on ? "" : "cat-ink"}`} />
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {category && (
+            <div className={`cat-${category} grid gap-3 sm:grid-cols-2`}>
+              {groupsFor(category).map((g) => (
+                <div key={g.key}>
+                  <p className="mb-1.5 text-xs font-bold text-muted">{g.label}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {g.options
+                      .filter((o) => !o.hidden)
+                      .map((o) => {
+                        const key = facetKey(g.key, o.key);
+                        const on = facets.includes(key);
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            aria-pressed={on}
+                            onClick={() => {
+                              setFacets((fs) => (on ? fs.filter((f) => f !== key) : [...fs, key]));
+                              markDirty();
+                            }}
+                            className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                              on ? "cat-gradient text-white" : "bg-surface text-muted ring-1 ring-border hover:text-foreground"
+                            }`}
+                          >
+                            {o.label}
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
               ))}
             </div>
           )}

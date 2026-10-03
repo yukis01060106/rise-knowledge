@@ -89,7 +89,7 @@ describe("レビュー申請（draft → ai_review → admin_review）", () => {
     const { author } = await setup();
     const { articleId, versionId } = await submitted(author.id);
     expect(await submitForReview(author, articleId)).toMatchObject({ ok: false, code: "invalid_state" });
-    expect(await saveDraft({ articleId, title: "審査中に変更", bodyMd: "x", tags: [], expectedUpdatedAt: null })).toMatchObject({
+    expect(await saveDraft({ articleId, title: "審査中に変更", bodyMd: "x", tags: [], category: "dev", expectedUpdatedAt: null })).toMatchObject({
       ok: false,
       code: "locked",
     });
@@ -192,7 +192,7 @@ describe("差し戻し（admin_review → rejected）と再申請", () => {
 
     // 修正すると v2 の下書きができ、差し戻された v1 はそのまま残る
     loginAs(author);
-    const saved = await saveDraft({ articleId, title: "直した記事", bodyMd: "伏せました", tags: [], expectedUpdatedAt: null });
+    const saved = await saveDraft({ articleId, title: "直した記事", bodyMd: "伏せました", tags: [], category: "dev", expectedUpdatedAt: null });
     expect(saved).toMatchObject({ ok: true, versionNo: 2 });
     if (!saved.ok) return;
     expect(await prisma.articleVersion.findUniqueOrThrow({ where: { id: saved.versionId } })).toMatchObject({
@@ -216,7 +216,7 @@ describe("公開後の編集", () => {
     const firstPublishedAt = (await prisma.article.findUniqueOrThrow({ where: { id: articleId } })).firstPublishedAt;
 
     loginAs(author);
-    const saved = await saveDraft({ articleId, title: "v2 のタイトル", bodyMd: "更新", tags: [], expectedUpdatedAt: null });
+    const saved = await saveDraft({ articleId, title: "v2 のタイトル", bodyMd: "更新", tags: [], category: "dev", expectedUpdatedAt: null });
     if (!saved.ok) throw new Error(saved.message);
     expect(await submitReviewAction(articleId)).toMatchObject({ ok: true });
 
@@ -400,7 +400,7 @@ describe("再申請のレビュー", () => {
     const { articleId, versionId: v1 } = await submitted(author.id);
     await rejectVersion(admin, v1, "直してください");
     loginAs(author);
-    const saved = await saveDraft({ articleId, title: "直した", bodyMd: "直した本文", tags: [], expectedUpdatedAt: null });
+    const saved = await saveDraft({ articleId, title: "直した", bodyMd: "直した本文", tags: [], category: "dev", expectedUpdatedAt: null });
     if (!saved.ok) throw new Error(saved.message);
     await submitReviewAction(articleId);
 

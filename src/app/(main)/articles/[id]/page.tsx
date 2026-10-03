@@ -6,6 +6,9 @@ import { renderMarkdown } from "@/server/markdown/render";
 import { Avatar } from "@/components/ui/avatar";
 import { DepartmentBadge } from "@/components/ui/department-badge";
 import { TagChip } from "@/components/ui/tag-chip";
+import { CategoryBadge } from "@/components/ui/category-badge";
+import { describeFacets } from "@/lib/taxonomy";
+import { readingMinutes } from "@/lib/excerpt";
 import { buttonClass } from "@/components/ui/button";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { UNTITLED } from "@/lib/articles";
@@ -32,7 +35,8 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[id]"
       )}
       {article.isAuthor && article.working && <WorkingVersionNotice articleId={article.id} working={article.working} isPreview={isPreview} />}
 
-      <article className="rounded-xl border border-border bg-surface px-5 py-6 sm:px-10 sm:py-10">
+      <article className={`cat-${shown.category ?? "dev"} card relative overflow-hidden px-5 py-7 sm:px-10 sm:py-10`}>
+        <span aria-hidden className="cat-gradient absolute inset-x-0 top-0 h-1.5" />
         <header className="mb-8">
           <div className="flex items-center gap-3">
             <Avatar name={article.author.name} department={article.author.department} />
@@ -55,9 +59,22 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[id]"
               </Link>
             )}
           </div>
-          <h1 className="mt-6 text-2xl leading-snug font-bold sm:text-3xl">{shown.title || UNTITLED}</h1>
-          {shown.tags.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-1.5">
+          <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-muted">
+            <CategoryBadge category={shown.category} />
+            <span>読了 {readingMinutes(shown.bodyMd)} 分</span>
+          </div>
+          <h1 className="mt-3 text-2xl leading-snug font-bold tracking-tight sm:text-4xl">{shown.title || UNTITLED}</h1>
+          {(shown.facets.length > 0 || shown.tags.length > 0) && (
+            <div className="mt-5 flex flex-wrap gap-1.5">
+              {describeFacets(shown.category, shown.facets).map((f) => (
+                <Link
+                  key={f.key}
+                  href={`/articles?cat=${shown.category}&f=${encodeURIComponent(f.key)}`}
+                  className="cat-soft rounded-md px-2 py-0.5 text-xs font-medium hover:brightness-95"
+                >
+                  {f.label}
+                </Link>
+              ))}
               {shown.tags.map((t) => (
                 <TagChip key={t.name} {...t} />
               ))}

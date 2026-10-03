@@ -35,6 +35,13 @@ enum VersionStatus {
   superseded
 }
 
+// 記事の大分類（src/lib/taxonomy.ts と同じキー）
+enum ArticleCategory {
+  dev
+  infra
+  career
+}
+
 // 監査ログの操作種別。フェーズが進むごとに追加する（docs/design/database.md）
 enum AuditAction {
   version_created
@@ -104,23 +111,26 @@ model Article {
 
 // 記事の版。審査に出した版（ai_review 以降）は内容を変更しない
 model ArticleVersion {
-  id               String        @id @default(uuid()) @db.Uuid
-  articleId        String        @map("article_id") @db.Uuid
-  versionNo        Int           @map("version_no")
+  id               String           @id @default(uuid()) @db.Uuid
+  articleId        String           @map("article_id") @db.Uuid
+  versionNo        Int              @map("version_no")
   title            String
-  bodyMd           String        @map("body_md")
-  status           VersionStatus @default(draft)
-  aiCheckFailed    Boolean       @default(false) @map("ai_check_failed")
+  bodyMd           String           @map("body_md")
+  status           VersionStatus    @default(draft)
+  aiCheckFailed    Boolean          @default(false) @map("ai_check_failed")
   // 著者名をイニシャルで表示する（審査の対象。審査に出した後は変更できない）
-  showInitials     Boolean       @default(false) @map("show_initials")
-  basedOnVersionId String?       @map("based_on_version_id") @db.Uuid
-  createdBy        String        @map("created_by") @db.Uuid
-  submittedAt      DateTime?     @map("submitted_at") @db.Timestamptz
-  decidedAt        DateTime?     @map("decided_at") @db.Timestamptz
-  decidedBy        String?       @map("decided_by") @db.Uuid
-  rejectReason     String?       @map("reject_reason")
-  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  showInitials     Boolean          @default(false) @map("show_initials")
+  // 大分類と属性（「軸:選択肢」のキー）。審査の対象。下書きでは未設定でもよい
+  category         ArticleCategory?
+  facets           String[]         @default([])
+  basedOnVersionId String?          @map("based_on_version_id") @db.Uuid
+  createdBy        String           @map("created_by") @db.Uuid
+  submittedAt      DateTime?        @map("submitted_at") @db.Timestamptz
+  decidedAt        DateTime?        @map("decided_at") @db.Timestamptz
+  decidedBy        String?          @map("decided_by") @db.Uuid
+  rejectReason     String?          @map("reject_reason")
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
   article         Article          @relation("ArticleVersions", fields: [articleId], references: [id], onDelete: Restrict)
   publishedOf     Article?         @relation("PublishedVersion")
@@ -134,6 +144,8 @@ model ArticleVersion {
   // マイグレーション SQL で作る（Prisma は式インデックスを無視するので消されない）
   @@unique([articleId, versionNo])
   @@index([submittedAt])
+  @@index([facets], type: Gin)
+  @@index([category])
   @@map("article_versions")
 }
 

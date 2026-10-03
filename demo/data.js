@@ -15,6 +15,8 @@ const SEED = [
   {
     author: "u-ichiro",
     daysAgo: 1,
+    category: "infra",
+    facets: ["kind:trouble", "infra.area:cloud", "infra.product:aws", "infra.phase:build"],
     title: "Terraform の state ロックが外れないときの対処",
     tags: ["Terraform", "AWS", "トラブルシューティング"],
     body: `## 発生した問題
@@ -50,6 +52,8 @@ terraform force-unlock <LOCK_ID>
     author: "u-taro",
     daysAgo: 1.5,
     showInitials: true,
+    category: "dev",
+    facets: ["kind:howto", "dev.area:tooling"],
     title: "はじめての投稿：現場で役立った小ワザ",
     tags: ["小ワザ", "Linux"],
     body: `## コマンド履歴を検索する
@@ -66,6 +70,8 @@ terraform force-unlock <LOCK_ID>
   {
     author: "u-midori",
     daysAgo: 2,
+    category: "dev",
+    facets: ["kind:howto", "dev.phase:implementation", "dev.lang:js-ts", "dev.area:frontend"],
     title: "TypeScript の satisfies を使って設定オブジェクトを安全に書く",
     tags: ["TypeScript", "初心者向け"],
     body: `## 概要
@@ -91,6 +97,8 @@ const routes = {
   {
     author: "u-ichiro",
     daysAgo: 4,
+    category: "infra",
+    facets: ["kind:trouble", "infra.area:server", "infra.product:linux", "infra.phase:operation"],
     title: "Linux サーバーのディスクが急に埋まったときに最初に見るところ",
     tags: ["Linux", "監視", "トラブルシューティング"],
     body: `## まず全体を見る
@@ -112,6 +120,8 @@ du -xh / --max-depth=1 2>/dev/null | sort -h | tail
   {
     author: "u-jiro",
     daysAgo: 6,
+    category: "dev",
+    facets: ["kind:learning", "dev.phase:test", "dev.phase:design"],
     title: "勉強会レポート：テストしやすいコードの書き方",
     tags: ["テスト", "勉強会", "設計"],
     body: `## きっかけ
@@ -132,6 +142,8 @@ du -xh / --max-depth=1 2>/dev/null | sort -h | tail
   {
     author: "u-midori",
     daysAgo: 9,
+    category: "dev",
+    facets: ["kind:howto", "dev.area:tooling"],
     title: "Git で直前のコミットにファイルを追加し忘れたとき",
     tags: ["Git", "初心者向け"],
     body: `## 手順
@@ -148,6 +160,8 @@ git commit --amend --no-edit
   {
     author: "u-ichiro",
     daysAgo: 12,
+    category: "infra",
+    facets: ["kind:howto", "infra.area:server", "infra.product:linux", "infra.phase:build"],
     title: "Ansible で冪等にユーザーを作るときのポイント",
     tags: ["Ansible", "Linux", "自動化"],
     body: `## 概要
@@ -164,6 +178,28 @@ git commit --amend --no-edit
 \`\`\`
 
 \`update_password: on_create\` にすると、2 回目以降はパスワードを更新しない。
+`,
+  },
+  {
+    author: "u-midori",
+    daysAgo: 3,
+    category: "career",
+    facets: ["kind:learning", "career.theme:onsite", "career.theme:communication"],
+    title: "常駐先で信頼してもらうために、最初の 1 か月でやったこと",
+    tags: ["常駐", "コミュニケーション"],
+    body: `## はじめに
+
+新しい現場に入って最初の 1 か月は、技術よりも「信頼」をつくる期間だと思っています。
+
+## やったこと
+
+1. **毎日の終わりに 3 行の報告**：やったこと・困っていること・明日やること
+2. **分からない言葉はメモして、まとめて質問**：相手の時間を何度も取らない
+3. **小さな改善を 1 つ**：手順書の誤りを直すなど、すぐ役に立つこと
+
+## 仲間に伝えたいポイント
+
+最初から完璧を目指さず、「この人に頼めば大丈夫」と思ってもらえる小さな積み重ねが大事でした。
 `,
   },
 ];
@@ -183,6 +219,7 @@ export function initialState() {
     articles.push({ id: articleId, authorId: s.author, publishedVersionId: versionId, firstPublishedAt: at, hidden: false });
     versions.push({
       id: versionId, articleId, no: 1, title: s.title, body: s.body, tags: s.tags, status: "published",
+      category: s.category, facets: s.facets,
       showInitials: Boolean(s.showInitials), submittedAt: at, decidedAt: at, decidedBy: "u-hanako",
       rejectReason: null, basedOn: null, updatedAt: at,
     });
@@ -197,11 +234,11 @@ export function initialState() {
   versions.push({
     id: id("v"), articleId: pendingArticle, no: 1, title: "VPN がつながらないときの確認手順",
     body: "## 確認すること\n\n1. 接続先ゲートウェイに ping（アドレスは社内 Wiki 参照）\n2. 証明書の期限\n3. 端末の時刻ずれ\n",
-    tags: ["VPN", "ネットワーク"], status: "admin_review", showInitials: false, submittedAt: at, decidedAt: null,
+    tags: ["VPN", "ネットワーク"], category: "infra", facets: ["kind:trouble", "infra.area:network"], status: "admin_review", showInitials: false, submittedAt: at, decidedAt: null,
     decidedBy: null, rejectReason: null, basedOn: null, updatedAt: at,
   });
   audit.push({ id: id("l"), at, actor: "u-jiro", action: "submitted", articleId: pendingArticle, versionNo: 1 });
   audit.push({ id: id("l"), at, actor: null, action: "ai_check_completed", articleId: pendingArticle, versionNo: 1 });
 
-  return { version: 1, currentUserId: null, articles, versions, audit, seq: n };
+  return { version: 2, currentUserId: null, articles, versions, audit, seq: n };
 }

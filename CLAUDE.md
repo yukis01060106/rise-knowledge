@@ -145,13 +145,16 @@ npm run db:seed:dev         # 動作確認用の架空ユーザーと公開記�
   の `advanceVersion` で正規の順に進める）
 - 記事の著者を一般の画面に出すときは `toPublicAuthor()` を通す（イニシャル表示の記事で実名・ユーザー ID を
   返さないため）。将来のユーザーページ・ランキング・通知でも、イニシャル表示の記事を実名にひもづけて見せない
+- 記事の分類（大分類・軸ごとの属性・自由タグ）は `src/lib/taxonomy.ts` が正。キーは変えない
+  （docs/design/taxonomy.md）
+- 見た目の定義（色・カード・分類ごとの色・記事本文）は `src/app/design.css`。本物とデモの両方が読み込む
 - 管理者向けの取得は `src/server/articles/admin-queries.ts`（ロールを関数の中でも確認する）
 - 記事の取得は `src/server/articles/queries.ts` を通す。Markdown の表示は `renderMarkdown()`
   （サニタイズ済みの `SanitizedHtml` を返す）だけを `dangerouslySetInnerHTML` に渡す
 - 画像は `/api/images/[id]` でログインを確認してから配信する。Markdown の画像はこの URL だけを表示し、
   外部の画像は表示しない（社外へのアクセス・トラッキングを防ぐ）
 - `demo/` は GitHub Pages で公開する操作デモ（CDN の Preact、データは架空で localStorage のみ）。本物のアプリの
-  コード・データには一切つながない。クラスを変えたら `npm run demo:css` で `demo/styles.css` を書き出してコミットする。
+  コード・データには一切つながない。クラスを変えたら `npm run demo:build` で `demo/styles.css` を書き出してコミットする。
   公開は `npm run demo:publish`（`demo/` を `gh-pages` ブランチに push し、GitHub Pages がそれを配信する）。
   画面の色（`src/app/globals.css` の `:root`）を変えたら `demo/styles.src.css` もそろえる
 - 認証：`src/server/auth/`。`getCurrentUser()` はロールを毎回 DB から読む。

@@ -1,6 +1,14 @@
 import { diffStats, foldUnchanged, lineDiff } from "@/lib/diff";
+import { categoryOf, describeFacets, type CategoryKey } from "@/lib/taxonomy";
 
-type Side = { title: string; bodyMd: string; tags: { name: string; displayName: string }[]; showInitials?: boolean };
+type Side = {
+  title: string;
+  bodyMd: string;
+  tags: { name: string; displayName: string }[];
+  showInitials?: boolean;
+  category?: CategoryKey | null;
+  facets?: string[];
+};
 
 /** 2 つの版の差分（タイトル・タグ・本文）。比較元がないとき（初回公開）は呼ばない */
 export function DiffView({ before, after, beforeLabel, afterLabel }: { before: Side; after: Side; beforeLabel: string; afterLabel: string }) {
@@ -11,6 +19,10 @@ export function DiffView({ before, after, beforeLabel, afterLabel }: { before: S
   const afterTags = new Set(after.tags.map((t) => t.name));
   const addedTags = after.tags.filter((t) => !beforeTags.has(t.name));
   const removedTags = before.tags.filter((t) => !afterTags.has(t.name));
+  const beforeFacets = describeFacets(before.category, before.facets ?? []);
+  const afterFacets = describeFacets(after.category, after.facets ?? []);
+  const addedFacets = afterFacets.filter((f) => !beforeFacets.some((b) => b.key === f.key));
+  const removedFacets = beforeFacets.filter((f) => !afterFacets.some((a) => a.key === f.key));
 
   return (
     <div className="space-y-3 text-sm">
@@ -24,6 +36,27 @@ export function DiffView({ before, after, beforeLabel, afterLabel }: { before: S
           <p className="bg-red-50 px-3 py-1 text-red-900 line-through decoration-red-300">{before.title}</p>
           <p className="bg-emerald-50 px-3 py-1 text-emerald-900">{after.title}</p>
         </div>
+      )}
+      {(before.category ?? null) !== (after.category ?? null) && (
+        <p className="text-xs">
+          <span className="font-semibold">大分類：</span>
+          {categoryOf(before.category)?.label ?? "未設定"} → <span className="font-semibold text-brand">{categoryOf(after.category)?.label ?? "未設定"}</span>
+        </p>
+      )}
+      {(addedFacets.length > 0 || removedFacets.length > 0) && (
+        <p className="flex flex-wrap gap-1.5">
+          <span className="text-xs font-semibold">属性：</span>
+          {addedFacets.map((f) => (
+            <span key={`+${f.key}`} className="rounded bg-emerald-50 px-1.5 text-xs text-emerald-900">
+              +{f.label}
+            </span>
+          ))}
+          {removedFacets.map((f) => (
+            <span key={`-${f.key}`} className="rounded bg-red-50 px-1.5 text-xs text-red-900 line-through">
+              {f.label}
+            </span>
+          ))}
+        </p>
       )}
       {Boolean(before.showInitials) !== Boolean(after.showInitials) && (
         <p className="text-xs">

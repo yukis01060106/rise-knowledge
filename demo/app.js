@@ -6,6 +6,9 @@ import DOMPurify from "https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.es.m
 import hljs from "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/es/highlight.min.js";
 import { USERS, initialState } from "./data.js";
 
+// 分類の定義は本物のアプリ（src/lib/taxonomy.ts）から書き出したもの（npm run demo:build）
+const { COMMON_GROUPS, CATEGORIES } = await (await fetch("./taxonomy.json")).json();
+
 /* ───────── 保存（このブラウザの中だけ） ───────── */
 
 const STORAGE_KEY = "rise-knowledge-demo";
@@ -13,7 +16,7 @@ const STORAGE_KEY = "rise-knowledge-demo";
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
-    if (saved && saved.version === 1) return saved;
+    if (saved && saved.version === 2) return saved;
   } catch {
     // 読めなければ初期状態から始める
   }
@@ -57,6 +60,25 @@ const TEMPLATES = [
 ];
 
 const userOf = (id) => USERS.find((u) => u.id === id);
+
+/* 分類（本物と同じ考え方：大分類 1 つ ＋ 軸ごとの属性。同じ軸の中は「どれか」、軸どうしは「すべて」） */
+const categoryOf = (key) => CATEGORIES.find((c) => c.key === key);
+const groupsFor = (key) => [...COMMON_GROUPS, ...(categoryOf(key)?.groups ?? [])];
+const facetKey = (g, o) => `${g}:${o}`;
+const describeFacets = (cat, facets = []) =>
+  cat ? groupsFor(cat).flatMap((g) => g.options.filter((o) => facets.includes(facetKey(g.key, o.key))).map((o) => ({ key: facetKey(g.key, o.key), group: g.key, groupLabel: g.label, label: o.label }))) : [];
+const excerptOf = (md, n = 90) => {
+  const t = (md ?? "")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, "")
+    .replace(/[*_~|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return t.length > n ? `${t.slice(0, n)}…` : t;
+};
+const readingMinutes = (md) => Math.max(1, Math.round((md ?? "").length / 500));
 const fmtDate = (iso) =>
   iso ? new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso)) : "-";
 const fmtDateTime = (iso) =>
@@ -212,7 +234,7 @@ const Link = ({ to, class: cls, children, onClick }) =>
 
 function Avatar({ name, department, size = "md" }) {
   const s = { sm: "size-6 text-xs", md: "size-8 text-sm", lg: "size-12 text-lg" }[size];
-  const c = department === "infra" ? "bg-slate-500" : "bg-brand";
+  const c = department === "infra" ? "bg-gradient-to-br from-slate-400 to-slate-700" : "bg-gradient-to-br from-brand-light to-brand-strong";
   return html`<span aria-hidden="true" class=${`inline-flex shrink-0 items-center justify-center rounded-full font-bold text-white ${s} ${c}`}>${(name ?? "?").charAt(0)}</span>`;
 }
 const DeptBadge = ({ department }) =>
@@ -248,27 +270,70 @@ const Tabs = ({ items, active }) => html`
   </nav>
 `;
 
-function ArticleList({ state, articles }) {
-  return html`
-    <ul class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
-      ${articles.map((a) => {
-        const v = publishedOf(state, a);
-        const author = publicAuthor(state, a, v);
-        return html`<li key=${a.id} class="flex gap-3 px-4 py-4 sm:px-5">
-          <${Avatar} name=${author.name} department=${author.department} />
-          <div class="min-w-0 flex-1">
-            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-              <span class="font-medium text-foreground">${author.name}</span>
-              <${DeptBadge} department=${author.department} />
-              <span>${fmtDate(a.firstPublishedAt)}</span>
-            </div>
-            <${Link} to=${`/articles/${a.id}`} class="mt-1 block text-lg leading-snug font-bold hover:text-brand">${v.title}<//>
-            ${v.tags.length > 0 && html`<div class="mt-2 flex flex-wrap gap-1.5">${v.tags.map((t) => html`<${TagChip} key=${t} tag=${t} />`)}</div>`}
-          </div>
-        </li>`;
-      })}
-    </ul>
-  `;
+const ICON_PATHS = {
+  dev: "M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16",
+  infra: "M4 5h16v5H4zM4 14h16v5H4zM8 7.5h.01M8 16.5h.01",
+  career: "M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8-4.3-4.1 5.9-.9z",
+};
+const CategoryIcon = ({ category, cls = "size-4" }) =>
+  html`<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class=${cls}><path d=${ICON_PATHS[category]} /></svg>`;
+function CategoryBadge({ category, size = "sm" }) {
+  const c = categoryOf(category);
+  if (!c) return null;
+  return html`<span class=${`cat-${c.key} cat-gradient inline-flex items-center rounded-full font-semibold text-white ${size === "md" ? "gap-1.5 px-3 py-1 text-sm" : "gap-1 px-2 py-0.5 text-xs"}`}>
+    <${CategoryIcon} category=${c.key} cls=${size === "md" ? "size-4" : "size-3.5"} />${c.label}
+  </span>`;
+}
+
+function cardData(state, a) {
+  const v = publishedOf(state, a);
+  return { a, v, author: publicAuthor(state, a, v), facets: describeFacets(v.category, v.facets) };
+}
+const CardChips = ({ d, max = 4 }) => {
+  const facets = d.facets.slice(0, max);
+  const tags = d.v.tags.slice(0, Math.max(0, max - facets.length));
+  return facets.length + tags.length === 0
+    ? null
+    : html`<div class=${`cat-${d.v.category ?? "dev"} flex flex-wrap gap-1.5`}>
+        ${facets.map((f) => html`<span class="cat-soft rounded-md px-2 py-0.5 text-xs font-medium">${f.label}</span>`)}
+        ${tags.map((t) => html`<span class="rounded-md bg-background px-2 py-0.5 text-xs text-muted">#${t}</span>`)}
+      </div>`;
+};
+const CardMeta = ({ d }) => html`<div class="flex items-center gap-2 text-xs text-muted">
+  <${Avatar} name=${d.author.name} department=${d.author.department} size="sm" />
+  <span class="font-medium text-foreground">${d.author.name}</span>
+  <${DeptBadge} department=${d.author.department} />
+  <span class="ml-auto shrink-0">${fmtDate(d.a.firstPublishedAt)} ・ ${readingMinutes(d.v.body)} 分</span>
+</div>`;
+
+function ArticleCards({ state, articles, columns = 1 }) {
+  return html`<ul class=${`grid gap-4 ${columns === 2 ? "md:grid-cols-2" : ""}`}>
+    ${articles.map((a) => {
+      const d = cardData(state, a);
+      return html`<li key=${a.id}>
+        <${Link} to=${`/articles/${a.id}`} class="card group flex h-full flex-col gap-3 overflow-hidden p-5">
+          <div><${CategoryBadge} category=${d.v.category} /></div>
+          <h3 class="text-lg leading-snug font-bold group-hover:text-brand">${d.v.title}</h3>
+          <p class="line-clamp-2 text-sm leading-relaxed text-muted">${excerptOf(d.v.body)}</p>
+          <${CardChips} d=${d} />
+          <div class="mt-auto pt-1"><${CardMeta} d=${d} /></div>
+        <//>
+      </li>`;
+    })}
+  </ul>`;
+}
+
+function FeaturedArticle({ state, a }) {
+  const d = cardData(state, a);
+  return html`<${Link} to=${`/articles/${a.id}`} class=${`cat-${d.v.category ?? "dev"} card group relative flex flex-col gap-4 overflow-hidden p-6 sm:p-8`}>
+    <span aria-hidden="true" class="cat-gradient absolute inset-x-0 top-0 h-1.5"></span>
+    <span aria-hidden="true" class="cat-gradient absolute -top-24 -right-24 size-56 rounded-full opacity-10"></span>
+    <div class="flex items-center gap-2"><span class="rounded-full bg-foreground px-2.5 py-0.5 text-xs font-bold text-white">NEW</span><${CategoryBadge} category=${d.v.category} /></div>
+    <h3 class="text-2xl leading-snug font-bold group-hover:text-brand sm:text-3xl">${d.v.title}</h3>
+    <p class="line-clamp-3 leading-relaxed text-muted">${excerptOf(d.v.body, 140)}</p>
+    <${CardChips} d=${d} max=${6} />
+    <${CardMeta} d=${d} />
+  <//>`;
 }
 
 /* ───────── 画面 ───────── */
@@ -276,70 +341,123 @@ function ArticleList({ state, articles }) {
 function LoginPage({ onLogin }) {
   const candidates = ["u-taro", "u-hanako", "u-ichiro"].map(userOf);
   return html`
-    <main class="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center gap-6 px-4 py-12">
-      <div class="text-center">
-        <img src="logo.png" alt="rise tech solutions" width="68" height="64" class="mx-auto mb-3" />
-        <h1 class="text-2xl font-bold text-brand-strong">rise ナレッジ</h1>
-        <p class="mt-2 text-sm text-muted">離れていても、ひとつのチーム！</p>
-        <p class="mt-3 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">操作デモ版（データはすべて架空）</p>
-      </div>
-      <div class="space-y-2">
-        <p class="text-sm font-semibold">だれとしてログインしますか？</p>
-        ${candidates.map(
-          (u) => html`<button type="button" onClick=${() => onLogin(u.id)} class="flex w-full items-center gap-3 rounded-lg border border-border bg-surface p-3 text-left hover:border-brand">
-            <${Avatar} name=${u.name} department=${u.department} />
-            <span class="flex-1">
-              <span class="block font-semibold">${u.name}</span>
-              <span class="text-xs text-muted">${DEPARTMENTS[u.department]}・${ROLES[u.role]}</span>
-            </span>
-            <span class="text-brand">→</span>
-          </button>`,
-        )}
-      </div>
-      <p class="text-xs text-muted">
-        おすすめの試し方：「開発 太郎」で記事を書いてレビュー申請 → 右上のメニューから「管理 花子」に切り替えて承認。
-        本物のサイトでは会社のアカウント（SSO）でログインします。
-      </p>
+    <main class="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
+      <section class="brand-gradient relative hidden overflow-hidden p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        <span aria-hidden="true" class="orbit orbit-spin -top-48 -left-32 size-[36rem] border-t-white/50 border-l-transparent"></span>
+        <span aria-hidden="true" class="orbit orbit-spin -right-40 -bottom-56 size-[30rem] border-r-transparent border-b-white/40 [animation-duration:70s]"></span>
+        <div class="relative flex items-center gap-3">
+          <span class="rounded-2xl bg-white p-2 shadow-lg"><img src="logo.png" alt="" width="40" height="38" /></span>
+          <span class="text-xl font-bold">rise ナレッジ</span>
+        </div>
+        <div class="relative space-y-6">
+          <p class="text-4xl leading-tight font-bold tracking-tight xl:text-5xl">離れていても、<br />ひとつのチーム。</p>
+          <p class="max-w-md text-white/85">学びを、仲間の武器にする。現場で得た知見を、客先で働く仲間へ届ける rise tech solutions の社内ナレッジ共有サイトです。</p>
+          <ul class="flex flex-wrap gap-2 text-sm">${CATEGORIES.map((c) => html`<li class="rounded-full bg-white/15 px-3 py-1 ring-1 ring-white/30">${c.label}</li>`)}</ul>
+        </div>
+        <p class="relative text-xs text-white/70">操作デモ版・データはすべて架空です</p>
+      </section>
+      <section class="flex flex-col justify-center px-6 py-14">
+        <div class="mx-auto w-full max-w-sm space-y-6">
+          <div class="text-center lg:text-left">
+            <img src="logo.png" alt="rise tech solutions" width="68" height="64" class="mx-auto mb-4 lg:hidden" />
+            <h1 class="text-2xl font-bold tracking-tight">rise ナレッジ <span class="brand-text">操作デモ</span></h1>
+            <p class="mt-1 text-sm text-muted">データは架空で、このブラウザの中だけに保存されます。</p>
+          </div>
+          <div class="space-y-2">
+            <p class="text-sm font-semibold">だれとしてログインしますか？</p>
+            ${candidates.map(
+              (u) => html`<button type="button" onClick=${() => onLogin(u.id)} class="card card-hover flex w-full items-center gap-3 p-3 text-left">
+                <${Avatar} name=${u.name} department=${u.department} />
+                <span class="flex-1"><span class="block font-semibold">${u.name}</span><span class="text-xs text-muted">${DEPARTMENTS[u.department]}・${ROLES[u.role]}</span></span>
+                <span class="text-brand">→</span>
+              </button>`,
+            )}
+          </div>
+          <p class="rounded-xl bg-brand-soft p-3 text-xs leading-relaxed text-brand-strong">
+            おすすめの試し方：「開発 太郎」で記事を書いてレビュー申請 → 右上のアバターから「管理 花子」に切り替えて承認。
+            本物のサイトでは会社のアカウント（SSO）でログインします。
+          </p>
+        </div>
+      </section>
     </main>
   `;
 }
 
 function HomePage({ state, me }) {
-  const latest = visibleArticles(state).slice(0, 10);
-  const tagCounts = tagSummary(state).slice(0, 15);
+  const all = visibleArticles(state);
+  const [featured, ...rest] = all.slice(0, 7);
+  const tagCounts = tagSummary(state).slice(0, 16);
   const mine = state.articles.filter((a) => a.authorId === me.id);
-  const drafts = mine.filter((a) => latestVersion(state, a.id)?.status === "draft").length;
-  const published = mine.filter((a) => a.publishedVersionId).length;
+  const groupOf = (a) => {
+    const l = latestVersion(state, a.id);
+    return !isWorking(l) ? null : l.status === "draft" ? "draft" : l.status === "rejected" ? "rejected" : "review";
+  };
+  const counts = { draft: 0, review: 0, rejected: 0, published: 0 };
+  for (const a of mine) {
+    const g = groupOf(a);
+    if (g) counts[g]++;
+    if (a.publishedVersionId) counts.published++;
+  }
+  const byCat = Object.fromEntries(CATEGORIES.map((c) => [c.key, all.filter((a) => publishedOf(state, a).category === c.key).length]));
+  const [q, setQ] = useState("");
   return html`
-    <div class="space-y-8">
-      <section class="rounded-xl bg-gradient-to-br from-brand-light via-brand to-brand-strong px-6 py-8 text-white sm:px-8">
-        <p class="text-sm opacity-80">ようこそ、${me.name.split(" ").pop()} さん</p>
-        <h1 class="mt-1 text-2xl font-bold sm:text-3xl">学びを、仲間の武器にする！</h1>
-        <p class="mt-2 max-w-xl text-sm opacity-90">現場で得た知見やハマりどころを共有しましょう。離れていても、ひとつのチーム。</p>
-        <div class="mt-5 flex flex-wrap gap-2">
-          <${Link} to="/articles/new" class=${btn("secondary") + " border-transparent text-foreground"}>記事を書く<//>
-          <${Link} to="/articles" class="rounded-md px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/50 hover:bg-white/10">記事を読む<//>
+    <div class="space-y-12">
+      <section class="brand-gradient relative overflow-hidden rounded-3xl px-6 py-10 text-white shadow-[0_24px_48px_-24px_rgb(0_71_157/0.55)] sm:px-10 sm:py-14">
+        <span aria-hidden="true" class="orbit orbit-spin -top-40 -right-24 size-[28rem] border-t-white/50 border-r-transparent"></span>
+        <span aria-hidden="true" class="orbit orbit-spin -right-8 -bottom-48 size-80 border-b-white/40 border-l-transparent [animation-duration:60s]"></span>
+        <span aria-hidden="true" class="absolute top-10 right-[22%] size-2 rounded-full bg-white/70"></span>
+        <span aria-hidden="true" class="absolute right-[12%] bottom-16 size-3 rounded-full bg-white/40"></span>
+        <div class="relative max-w-2xl">
+          <p class="text-sm font-medium text-white/80">ようこそ、${me.name.split(" ").pop()} さん</p>
+          <h1 class="mt-2 text-3xl leading-tight font-bold tracking-tight sm:text-5xl">学びを、<br class="sm:hidden" />仲間の武器にする。</h1>
+          <p class="mt-3 text-sm leading-relaxed text-white/85 sm:text-base">現場で得た知見やハマりどころを、離れて働く仲間へ。<br class="hidden sm:inline" />離れていても、ひとつのチーム。</p>
+          <form onSubmit=${(e) => (e.preventDefault(), go(`/search?q=${encodeURIComponent(q)}`))} class="mt-6 flex max-w-lg gap-2 rounded-full bg-white/95 p-1.5 shadow-lg">
+            <input value=${q} onInput=${(e) => setQ(e.target.value)} type="search" placeholder="キーワードで探す（例：Terraform ロック）" class="min-w-0 flex-1 rounded-full bg-transparent px-4 text-sm text-foreground placeholder:text-gray-400 focus:outline-none" />
+            <button class="brand-gradient rounded-full px-5 py-2 text-sm font-semibold text-white">検索</button>
+          </form>
+          <div class="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/90">
+            <${Link} to="/articles/new" class="font-semibold underline-offset-4 hover:underline">✍ 記事を書く<//>
+            <span>公開記事 <strong class="text-lg">${all.length}</strong> 本</span>
+            <span>あなたの下書き <strong class="text-lg">${counts.draft}</strong> 件</span>
+          </div>
         </div>
       </section>
-      <div class="grid gap-8 xl:grid-cols-[1fr_260px]">
-        <section>
-          <div class="mb-3 flex items-center justify-between">
-            <h2 class="text-lg font-bold">新着記事</h2>
-            <${Link} to="/articles" class="text-sm text-brand hover:underline">すべて見る →<//>
-          </div>
-          <${ArticleList} state=${state} articles=${latest} />
+
+      <section>
+        <h2 class="mb-4 text-xl font-bold">分類から探す</h2>
+        <div class="grid gap-4 sm:grid-cols-3">
+          ${CATEGORIES.map(
+            (c) => html`<${Link} to=${`/articles?cat=${c.key}`} class=${`cat-${c.key} cat-gradient group relative block overflow-hidden rounded-2xl p-5 text-white shadow-md transition-transform hover:-translate-y-0.5`}>
+              <span aria-hidden="true" class="orbit -right-10 -bottom-16 size-40 border-white/25"></span>
+              <span class="inline-flex size-10 items-center justify-center rounded-xl bg-white/20"><${CategoryIcon} category=${c.key} cls="size-5" /></span>
+              <p class="mt-4 text-lg font-bold">${c.label}</p>
+              <p class="mt-1 text-xs leading-relaxed text-white/85">${c.description}</p>
+              <p class="mt-4 text-sm font-semibold">${byCat[c.key]} 本 <span class="inline-block transition-transform group-hover:translate-x-1">→</span></p>
+            <//>`,
+          )}
+        </div>
+      </section>
+
+      <div class="grid gap-10 xl:grid-cols-[minmax(0,1fr)_260px]">
+        <section class="space-y-4">
+          <div class="flex items-end justify-between"><h2 class="text-xl font-bold">新着記事</h2><${Link} to="/articles" class="text-sm font-medium text-brand hover:underline">すべて見る →<//></div>
+          ${featured && html`<${FeaturedArticle} state=${state} a=${featured} />`}
+          ${rest.length > 0 && html`<${ArticleCards} state=${state} articles=${rest} columns=${2} />`}
         </section>
         <aside class="space-y-6">
-          <section class="rounded-lg border border-border bg-surface p-4">
+          <section class="card p-5">
             <h2 class="text-sm font-bold">自分の記事</h2>
-            <p class="mt-2 text-sm text-muted">
-              下書き <span class="text-lg font-bold text-foreground">${drafts}</span> 件 ・ 公開中 <span class="text-lg font-bold text-foreground">${published}</span> 件
-            </p>
-            <${Link} to="/me/articles" class="mt-3 inline-block text-sm text-brand hover:underline">自分の記事を見る →<//>
+            <div class="mt-3 grid grid-cols-2 gap-2 text-center">
+              ${[["下書き", counts.draft, "draft"], ["審査中", counts.review, "review"], ["差し戻し", counts.rejected, "rejected"], ["公開中", counts.published, "published"]].map(
+                ([label, n, tab]) => html`<${Link} to=${`/me/articles?tab=${tab}`} class="block rounded-xl bg-background px-2 py-3 hover:bg-brand-soft"><span class="block text-2xl font-bold">${n}</span><span class="text-xs text-muted">${label}</span><//>`,
+              )}
+            </div>
           </section>
-          <section class="rounded-lg border border-border bg-surface p-4">
-            <h2 class="text-sm font-bold">人気のタグ</h2>
-            <div class="mt-3 flex flex-wrap gap-1.5">${tagCounts.map((t) => html`<${TagChip} key=${t.name} tag=${t.display} />`)}</div>
+          <section class="card p-5">
+            <div class="flex items-center justify-between"><h2 class="text-sm font-bold">人気のタグ</h2><${Link} to="/tags" class="text-xs text-brand hover:underline">一覧<//></div>
+            <div class="mt-3 flex flex-wrap gap-1.5">
+              ${tagCounts.map((t) => html`<${Link} to=${`/tags/${encodeURIComponent(t.name)}`} class="rounded-full border border-border px-2.5 py-1 text-xs hover:border-brand hover:text-brand">#${t.display}<span class="ml-1 text-muted">${t.count}</span><//>`)}
+            </div>
           </section>
         </aside>
       </div>
@@ -361,20 +479,67 @@ function tagSummary(state) {
 }
 
 function ArticlesPage({ state, query }) {
-  const dept = query.get("dept");
-  const list = visibleArticles(state).filter((a) => !dept || (state.userSettings?.[a.authorId]?.department ?? userOf(a.authorId).department) === dept);
+  const cat = categoryOf(query.get("cat"))?.key;
+  const selected = cat ? describeFacets(cat, query.getAll("f")).map((f) => f.key) : [];
+  const all = visibleArticles(state);
+  const inCat = cat ? all.filter((a) => publishedOf(state, a).category === cat) : all;
+  // 同じ軸の中は「どれか」、軸どうしは「すべて」
+  const byGroup = {};
+  for (const f of describeFacets(cat, selected)) (byGroup[f.group] ??= []).push(f.key);
+  const list = inCat.filter((a) => Object.values(byGroup).every((keys) => keys.some((k) => publishedOf(state, a).facets?.includes(k))));
+  const facetCount = (key) => inCat.filter((a) => publishedOf(state, a).facets?.includes(key)).length;
+  const href = (c, fs) => {
+    const sp = new URLSearchParams();
+    if (c) sp.set("cat", c);
+    for (const f of fs) sp.append("f", f);
+    const qs = sp.toString();
+    return qs ? `/articles?${qs}` : "/articles";
+  };
+  const current = categoryOf(cat);
+  const countOf = (k) => all.filter((a) => publishedOf(state, a).category === k).length;
   return html`
-    <div class="mx-auto max-w-3xl">
-      <${PageHeader} title="記事" description=${`公開中の記事 ${list.length} 件（新着順）`} />
-      <${Tabs}
-        active=${dept ?? "all"}
-        items=${[
-          { key: "all", label: "すべて", to: "/articles" },
-          { key: "dev", label: "開発部", to: "/articles?dept=dev" },
-          { key: "infra", label: "インフラ部", to: "/articles?dept=infra" },
-        ]}
-      />
-      ${list.length ? html`<${ArticleList} state=${state} articles=${list} />` : html`<${Empty} title="記事はまだありません" />`}
+    <div class="space-y-6">
+      <header class=${`${current ? `cat-${current.key} cat-gradient` : "brand-gradient"} relative overflow-hidden rounded-3xl px-6 py-7 text-white sm:px-8`}>
+        <span aria-hidden="true" class="orbit orbit-spin -top-24 -right-16 size-72 border-t-white/50 border-r-transparent"></span>
+        <p class="relative text-sm text-white/80">記事</p>
+        <h1 class="relative mt-1 text-2xl font-bold sm:text-3xl">${current ? current.label : "すべての記事"}</h1>
+        <p class="relative mt-1 text-sm text-white/85">${current ? current.description : "分類と属性をかけ合わせて、読みたい記事を探せます。"}</p>
+      </header>
+      <nav class="flex flex-wrap gap-2">
+        <${Link} to="/articles" class=${`rounded-full px-4 py-2 text-sm font-semibold ${!cat ? "bg-foreground text-white" : "bg-surface text-muted ring-1 ring-border hover:text-foreground"}`}>すべて <span class="ml-1 opacity-70">${all.length}</span><//>
+        ${CATEGORIES.map((c) => {
+          const on = c.key === cat;
+          return html`<${Link} to=${href(c.key, [])} class=${`cat-${c.key} inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold ${on ? "cat-gradient text-white shadow" : "bg-surface ring-1 ring-border"}`}>
+            <${CategoryIcon} category=${c.key} cls=${`size-4 ${on ? "" : "cat-ink"}`} />${c.label}<span class="opacity-70">${countOf(c.key)}</span>
+          <//>`;
+        })}
+      </nav>
+      <div class=${cat ? "grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]" : ""}>
+        ${cat &&
+        html`<aside class=${`cat-${cat} card h-fit space-y-5 p-4 lg:sticky lg:top-24`}>
+          ${groupsFor(cat).map(
+            (g) => html`<div>
+              <p class="mb-2 text-xs font-bold text-muted">${g.label}</p>
+              <div class="flex flex-wrap gap-1.5">
+                ${g.options.filter((o) => !o.hidden).map((o) => {
+                  const key = facetKey(g.key, o.key);
+                  const on = selected.includes(key);
+                  const n = facetCount(key);
+                  return html`<${Link} to=${href(cat, on ? selected.filter((x) => x !== key) : [...selected, key])} class=${`rounded-full px-2.5 py-1 text-xs font-medium ${on ? "cat-gradient text-white shadow-sm" : n > 0 ? "cat-soft" : "bg-background text-gray-400"}`}>${o.label}<span class="ml-1 opacity-70">${n}</span><//>`;
+                })}
+              </div>
+            </div>`,
+          )}
+        </aside>`}
+        <section class="min-w-0 space-y-4">
+          <div class="flex flex-wrap items-center gap-2 text-sm">
+            <span class="font-semibold">${list.length} 件</span>
+            ${describeFacets(cat, selected).map((f) => html`<${Link} to=${href(cat, selected.filter((x) => x !== f.key))} class=${`cat-${cat} cat-soft rounded-full px-2.5 py-0.5 text-xs font-medium`}>${f.groupLabel}：${f.label} ×<//>`)}
+            ${selected.length > 0 && html`<${Link} to=${href(cat, [])} class="text-xs text-muted underline">条件をクリア<//>`}
+          </div>
+          ${list.length ? html`<${ArticleCards} state=${state} articles=${list} columns=${cat ? 1 : 2} />` : html`<${Empty} title="条件に合う記事はまだありません">条件を減らすか、この分野の記事を書いてみませんか？<//>`}
+        </section>
+      </div>
     </div>
   `;
 }
@@ -403,7 +568,7 @@ function TagPage({ state, name }) {
   return html`
     <div class="mx-auto max-w-3xl">
       <${PageHeader} title=${`#${display}`} description=${`公開中の記事 ${list.length} 件`} />
-      ${list.length ? html`<${ArticleList} state=${state} articles=${list} />` : html`<${Empty} title="このタグの公開記事はまだありません" />`}
+      ${list.length ? html`<${ArticleCards} state=${state} articles=${list} />` : html`<${Empty} title="このタグの公開記事はまだありません" />`}
     </div>
   `;
 }
@@ -426,7 +591,7 @@ function SearchPage({ state, query }) {
         <input value=${input} onInput=${(e) => setInput(e.target.value)} type="search" placeholder="例：Terraform ロック" class="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-2 focus:border-brand focus:outline-none" />
         <button class=${btn()}>検索</button>
       </form>
-      ${results && (results.length ? html`<${ArticleList} state=${state} articles=${results} />` : html`<${Empty} title="見つかりませんでした">別のことばで試してみてください。<//>`)}
+      ${results && (results.length ? html`<${ArticleCards} state=${state} articles=${results} />` : html`<${Empty} title="見つかりませんでした">別のことばで試してみてください。<//>`)}
     </div>
   `;
 }
@@ -463,7 +628,8 @@ function ArticlePage({ state, me, id }) {
         </div>
         ${!reviewing && html`<${Link} to=${`/articles/${id}/edit`} class=${btn("secondary", "sm")}>${rejected ? "修正する" : "編集を続ける"}<//>`}
       </div>`}
-      <article class="rounded-xl border border-border bg-surface px-5 py-6 sm:px-10 sm:py-10">
+      <article class=${`cat-${shown.category ?? "dev"} card relative overflow-hidden px-5 py-7 sm:px-10 sm:py-10`}>
+        <span aria-hidden="true" class="cat-gradient absolute inset-x-0 top-0 h-1.5"></span>
         <header class="mb-8">
           <div class="flex items-center gap-3">
             <${Avatar} name=${author.name} department=${author.department} />
@@ -473,8 +639,12 @@ function ArticlePage({ state, me, id }) {
             </div>
             ${isAuthor && !working && html`<${Link} to=${`/articles/${id}/edit`} class=${btn("secondary", "sm") + " ml-auto"}>編集する<//>`}
           </div>
-          <h1 class="mt-6 text-2xl leading-snug font-bold sm:text-3xl">${shown.title || "（無題）"}</h1>
-          ${shown.tags.length > 0 && html`<div class="mt-4 flex flex-wrap gap-1.5">${shown.tags.map((t) => html`<${TagChip} key=${t} tag=${t} />`)}</div>`}
+          <div class="mt-6 flex flex-wrap items-center gap-2 text-xs text-muted"><${CategoryBadge} category=${shown.category} /><span>読了 ${readingMinutes(shown.body)} 分</span></div>
+          <h1 class="mt-3 text-2xl leading-snug font-bold tracking-tight sm:text-4xl">${shown.title || "（無題）"}</h1>
+          <div class="mt-5 flex flex-wrap gap-1.5">
+            ${describeFacets(shown.category, shown.facets).map((f) => html`<${Link} to=${`/articles?cat=${shown.category}&f=${encodeURIComponent(f.key)}`} class="cat-soft rounded-md px-2 py-0.5 text-xs font-medium">${f.label}<//>`)}
+            ${shown.tags.map((t) => html`<${TagChip} key=${t} tag=${t} />`)}
+          </div>
         </header>
         <${Markdown} source=${shown.body} />
       </article>
@@ -501,6 +671,8 @@ function EditorForm({ state, me, id, latest, source, actions }) {
   const [body, setBody] = useState(source?.body ?? "");
   const [tags, setTags] = useState(source?.tags.join(" ") ?? "");
   const [showInitials, setShowInitials] = useState(source?.showInitials ?? false);
+  const [category, setCategory] = useState(source?.category ?? me.department);
+  const [facets, setFacets] = useState(source?.facets ?? []);
   const [view, setView] = useState("edit");
   const [savedAt, setSavedAt] = useState(latest?.status === "draft" ? latest.updatedAt : null);
   const [error, setError] = useState(null);
@@ -511,7 +683,8 @@ function EditorForm({ state, me, id, latest, source, actions }) {
 
   const save = () => {
     if (!articleId.current && !title.trim() && !body.trim()) return null;
-    const result = actions.saveDraft(articleId.current, { title, body, tags: tagList.slice(0, 5), showInitials });
+    const allowed = groupsFor(category).flatMap((g) => g.options.map((o) => facetKey(g.key, o.key)));
+    const result = actions.saveDraft(articleId.current, { title, body, tags: tagList.slice(0, 5), showInitials, category, facets: allowed.filter((f) => facets.includes(f)) });
     articleId.current = result.articleId;
     dirty.current = false;
     setSavedAt(new Date().toISOString());
@@ -524,7 +697,7 @@ function EditorForm({ state, me, id, latest, source, actions }) {
     if (!dirty.current) return;
     const t = setTimeout(save, 1500);
     return () => clearTimeout(t);
-  }, [title, body, tags, showInitials]);
+  }, [title, body, tags, showInitials, category, facets]);
 
   const change = (setter) => (e) => {
     dirty.current = true;
@@ -542,6 +715,7 @@ function EditorForm({ state, me, id, latest, source, actions }) {
     setError(null);
     if (!title.trim()) return setError("タイトルを入力してください");
     if (!body.trim()) return setError("本文を入力してください");
+    if (!category) return setError("大分類（開発・インフラ・キャリア）を選んでください");
     if (!confirm("レビューを申請しますか？申請中は編集できません。")) return;
     const aid = save();
     actions.submit(aid);
@@ -557,7 +731,7 @@ function EditorForm({ state, me, id, latest, source, actions }) {
       </div>`}
       ${latest?.status === "published" &&
       html`<p class="rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm text-sky-900">公開中の記事を編集しています。保存すると新しい版として下書きになり、公開中の内容は承認されるまでそのまま表示されます。</p>`}
-      <div class="rounded-xl border border-border bg-surface">
+      <div class="card overflow-hidden">
         <div class="space-y-2 border-b border-border p-4">
           <input value=${title} onInput=${change(setTitle)} maxlength="100" placeholder="タイトル" class="w-full bg-transparent text-xl font-bold placeholder:text-gray-400 focus:outline-none sm:text-2xl" />
           <input value=${tags} onInput=${change(setTags)} placeholder="タグを空白区切りで 5 つまで（例：AWS Terraform 初心者向け）" class="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:border-brand focus:bg-surface focus:outline-none" />
@@ -569,6 +743,39 @@ function EditorForm({ state, me, id, latest, source, actions }) {
             ${!myInitials && html`<${Link} to="/me/settings" class="text-xs text-brand hover:underline">イニシャルを登録する<//>`}
           </div>
           ${tagList.length > 0 && html`<div class="flex flex-wrap gap-1.5">${tagList.map((t, i) => html`<span class=${`rounded-full px-2.5 py-0.5 text-xs ${i < 5 ? "bg-brand-soft text-brand-strong" : "bg-red-50 text-danger line-through"}`}>#${t}</span>`)}</div>`}
+        </div>
+        <div class="space-y-3 border-b border-border bg-background/60 p-4">
+          <div>
+            <p class="mb-2 text-xs font-bold text-muted">大分類 <span class="text-danger">*</span><span class="ml-1 font-normal">（申請に必要）</span></p>
+            <div class="flex flex-wrap gap-2">
+              ${CATEGORIES.map((c) => {
+                const on = category === c.key;
+                return html`<button type="button" aria-pressed=${on} onClick=${() => {
+                  const allowed = new Set(groupsFor(c.key).flatMap((g) => g.options.map((o) => facetKey(g.key, o.key))));
+                  dirty.current = true;
+                  setCategory(c.key);
+                  setFacets((fs) => fs.filter((f) => allowed.has(f)));
+                }} class=${`cat-${c.key} inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold ${on ? "cat-gradient text-white shadow" : "bg-surface ring-1 ring-border"}`}>
+                  <${CategoryIcon} category=${c.key} cls=${`size-4 ${on ? "" : "cat-ink"}`} />${c.label}
+                </button>`;
+              })}
+            </div>
+          </div>
+          ${category &&
+          html`<div class=${`cat-${category} grid gap-3 sm:grid-cols-2`}>
+            ${groupsFor(category).map(
+              (g) => html`<div>
+                <p class="mb-1.5 text-xs font-bold text-muted">${g.label}</p>
+                <div class="flex flex-wrap gap-1.5">
+                  ${g.options.filter((o) => !o.hidden).map((o) => {
+                    const key = facetKey(g.key, o.key);
+                    const on = facets.includes(key);
+                    return html`<button type="button" aria-pressed=${on} onClick=${() => ((dirty.current = true), setFacets((fs) => (on ? fs.filter((f) => f !== key) : [...fs, key])))} class=${`rounded-full px-2.5 py-1 text-xs font-medium ${on ? "cat-gradient text-white" : "bg-surface text-muted ring-1 ring-border"}`}>${o.label}</button>`;
+                  })}
+                </div>
+              </div>`,
+            )}
+          </div>`}
         </div>
         <div class="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2 text-sm">
           <select onChange=${(e) => (insertTemplate(e.target.value), (e.target.value = ""))} class="rounded-md border border-border bg-surface px-2 py-1">
@@ -707,6 +914,7 @@ function ReviewsPage({ state, me, query }) {
                 <${Link} to=${`/admin/reviews/${v.id}`} class="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-background">
                   <div class="min-w-0 flex-1">
                     <p class="flex flex-wrap items-center gap-2 text-xs text-muted">
+                      <${CategoryBadge} category=${v.category} />
                       <span class=${`rounded px-1.5 py-0.5 font-semibold ${a.publishedVersionId ? "bg-sky-50 text-sky-800" : "bg-emerald-50 text-emerald-800"}`}>${a.publishedVersionId ? `更新 v${v.no}` : "新規"}</span>
                       ${v.showInitials && html`<span class="rounded bg-violet-50 px-1.5 py-0.5 text-violet-800">イニシャル表示</span>`}
                       ${a.authorId === me.id && html`<span class="rounded bg-gray-100 px-1.5 py-0.5">自分の記事</span>`}
@@ -749,6 +957,11 @@ function ReviewPage({ state, me, versionId, actions }) {
               <span class="text-foreground">${author.name}</span>
               ${v.showInitials && html`<span class="rounded bg-violet-50 px-1.5 py-0.5 text-xs text-violet-800">イニシャル表示（${initials}）で公開</span>`}
               <span>v${v.no}</span><span>申請 ${fmtDateTime(v.submittedAt)}</span>
+            </div>
+            <div class=${`cat-${v.category ?? "dev"} mt-3 flex flex-wrap items-center gap-1.5`}>
+              <${CategoryBadge} category=${v.category} />
+              ${describeFacets(v.category, v.facets).map((f) => html`<span class="cat-soft rounded-md px-2 py-0.5 text-xs font-medium">${f.groupLabel}：${f.label}</span>`)}
+              ${v.tags.map((t) => html`<span class="rounded-md bg-background px-2 py-0.5 text-xs text-muted">#${t}</span>`)}
             </div>
           </div>
           ${previousRejected &&
@@ -940,15 +1153,19 @@ const ICONS = {
   audit: "M12 8v4l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z",
 };
 
-function SideNav({ me, path, pending, onNavigate }) {
+function SideNav({ me, path, query, pending, onNavigate }) {
   const sections = [
     {
       items: [
         ["/", "ホーム", "home", (p) => p === "/"],
-        ["/articles", "記事", "articles", (p) => p === "/articles" || /^\/articles\/[^/]+$/.test(p)],
+        ["/articles", "記事", "articles", (p) => (p === "/articles" && !query.get("cat")) || /^\/articles\/[^/]+$/.test(p)],
         ["/tags", "タグ", "tags", (p) => p.startsWith("/tags")],
         ["/search", "検索", "search", (p) => p.startsWith("/search")],
       ],
+    },
+    {
+      title: "分類",
+      items: CATEGORIES.map((c) => [`/articles?cat=${c.key}`, c.label, `cat:${c.key}`, (p) => p === "/articles" && query.get("cat") === c.key]),
     },
     {
       title: "自分",
@@ -976,8 +1193,11 @@ function SideNav({ me, path, pending, onNavigate }) {
         <ul class="space-y-0.5">
           ${s.items.map(([to, label, icon, match, badge]) => {
             const active = match(path);
-            return html`<li><${Link} to=${to} onClick=${onNavigate} class=${`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium ${active ? "bg-brand-soft text-brand-strong" : "text-foreground/80 hover:bg-surface"}`}>
-              ${ICON(ICONS[icon])}<span class="flex-1">${label}</span>${badge ? html`<span class="rounded-full bg-accent px-1.5 text-xs font-bold text-white">${badge}</span>` : null}
+            const iconEl = icon.startsWith("cat:")
+              ? html`<span class=${`cat-${icon.slice(4)} cat-gradient inline-flex size-5 shrink-0 items-center justify-center rounded-md text-white`}><${CategoryIcon} category=${icon.slice(4)} cls="size-3.5" /></span>`
+              : ICON(ICONS[icon]);
+            return html`<li><${Link} to=${to} onClick=${onNavigate} class=${`relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${active ? "bg-surface text-brand-strong shadow-sm ring-1 ring-border" : "text-foreground/75 hover:bg-surface/70"}`}>
+              ${active && html`<span aria-hidden="true" class="brand-gradient absolute inset-y-2 -left-0.5 w-1 rounded-full"></span>`}${iconEl}<span class="flex-1">${label}</span>${badge ? html`<span class="rounded-full bg-accent px-1.5 text-xs font-bold text-white">${badge}</span>` : null}
             <//></li>`;
           })}
         </ul>
@@ -1008,14 +1228,14 @@ function Shell({ state, me, route, actions, children }) {
         操作デモ版です。データは架空で、このブラウザの中だけに保存されます。
         <button type="button" class="ml-2 underline" onClick=${() => confirm("デモを最初の状態に戻しますか？") && actions.reset()}>最初からやり直す</button>
       </div>
-      <header class="sticky top-0 z-20 border-b border-border bg-surface">
+      <header class="glass sticky top-0 z-20 border-b border-white/60 shadow-[0_1px_0_rgb(15_35_70/0.06)]">
         <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5">
-          <${Link} to="/" class="flex items-center gap-2 font-bold text-brand-strong"><img src="logo.png" alt="" width="30" height="28" /><span class="hidden sm:inline">rise ナレッジ</span><//>
+          <${Link} to="/" class="flex items-center gap-2 font-bold text-brand-strong"><img src="logo.png" alt="" width="30" height="28" /><span class="brand-text hidden text-lg tracking-tight sm:inline">rise ナレッジ</span><//>
           <form onSubmit=${search} class="ml-auto hidden w-72 md:block">
-            <input value=${q} onInput=${(e) => setQ(e.target.value)} type="search" placeholder="記事を検索" class="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:border-brand focus:bg-surface focus:outline-none" />
+            <input value=${q} onInput=${(e) => setQ(e.target.value)} type="search" placeholder="記事を検索" class="w-full rounded-full border border-border bg-surface/80 px-4 py-1.5 text-sm focus:border-brand focus:bg-surface focus:outline-none" />
           </form>
           <div class="ml-auto flex items-center gap-2 md:ml-0">
-            <${Link} to="/articles/new" class=${btn("primary", "sm")}>記事を書く<//>
+            <${Link} to="/articles/new" class=${btn("primary", "sm") + " brand-gradient rounded-full px-3.5 shadow-sm"}>記事を書く<//>
             <div class="relative">
               <button type="button" onClick=${() => setMenu(!menu)} class="rounded-md px-1 py-1 hover:bg-background" aria-label="ユーザーメニュー"><${Avatar} name=${me.name} department=${dept} /></button>
               ${menu &&
@@ -1038,7 +1258,7 @@ function Shell({ state, me, route, actions, children }) {
         </div>
       </header>
       <div class="mx-auto grid w-full max-w-7xl flex-1 gap-8 px-4 lg:grid-cols-[minmax(0,1fr)_200px]">
-        <aside class="hidden lg:order-last lg:block"><div class="sticky top-16 py-8"><${SideNav} me=${me} path=${route.path} pending=${pending} /></div></aside>
+        <aside class="hidden lg:order-last lg:block"><div class="sticky top-16 py-8"><${SideNav} me=${me} path=${route.path} query=${route.query} pending=${pending} /></div></aside>
         <main class="min-w-0 py-8">${children}</main>
       </div>
       <footer class="border-t border-border py-6 text-center text-xs text-muted">
@@ -1050,7 +1270,7 @@ function Shell({ state, me, route, actions, children }) {
         <div class="absolute inset-y-0 right-0 flex w-72 max-w-[85vw] flex-col gap-4 overflow-y-auto bg-background p-4 shadow-xl">
           <div class="flex items-center justify-between"><span class="font-bold text-brand-strong">メニュー</span><button type="button" onClick=${() => setDrawer(false)} aria-label="メニューを閉じる" class="rounded-md p-1.5 hover:bg-surface">✕</button></div>
           <form onSubmit=${search}><input value=${q} onInput=${(e) => setQ(e.target.value)} type="search" placeholder="記事を検索" class="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" /></form>
-          <${SideNav} me=${me} path=${route.path} pending=${pending} onNavigate=${() => setDrawer(false)} />
+          <${SideNav} me=${me} path=${route.path} query=${route.query} pending=${pending} onNavigate=${() => setDrawer(false)} />
         </div>
       </div>`}
     </div>
@@ -1214,4 +1434,7 @@ function App() {
   return html`<${Shell} state=${state} me=${me} route=${route} actions=${actions}>${page}<//>`;
 }
 
-render(html`<${App} />`, document.getElementById("app"));
+// 「読み込み中…」の表示を消してから描画する（Preact は元からある中身を残すため）
+const root = document.getElementById("app");
+root.textContent = "";
+render(html`<${App} />`, root);

@@ -192,7 +192,15 @@ async function main() {
         const article = await tx.article.create({ data: { authorId, createdAt: at } });
         // 新しい版は DB のトリガーで draft からしか作れないため、正規の遷移の順に進める
         const version = await tx.articleVersion.create({
-          data: { articleId: article.id, versionNo: 1, title: a.title, bodyMd: a.body, createdBy: authorId, createdAt: at },
+          data: {
+            articleId: article.id,
+            versionNo: 1,
+            title: a.title,
+            bodyMd: a.body,
+            category: USERS[a.author].department,
+            createdBy: authorId,
+            createdAt: at,
+          },
         });
         for (const t of tags.tags) {
           const tag = await tx.tag.upsert({ where: { name: t.name }, update: {}, create: t });

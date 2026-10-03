@@ -16,7 +16,7 @@ rise tech solutions 社内ナレッジ共有サイト（社内限定）。
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/mobile-top.jpg" width="240" alt="スマホのトップ画面"> | <img src="docs/screenshots/mobile-login.jpg" width="240" alt="スマホのログイン画面"> | <img src="docs/screenshots/mobile-menu.jpg" width="240" alt="スマホのメニュー"> |
 
-**トップ（PC）** — 新着記事、人気のタグ。メニューは右側
+**トップ（PC）** — ロゴの青を基調に。分類から探す、新着記事、人気のタグ。メニューは右側
 
 ![トップ画面](docs/screenshots/desktop-top.jpg)
 
@@ -24,7 +24,7 @@ rise tech solutions 社内ナレッジ共有サイト（社内限定）。
 
 ![記事の画面](docs/screenshots/desktop-article.jpg)
 
-**記事を書く** — 左で入力、右でプレビュー。自動で下書き保存、画像の貼り付け、イニシャル表示での投稿
+**記事を書く** — 左で入力、右でプレビュー。大分類と属性の選択、自動で下書き保存、画像の貼り付け、イニシャル表示での投稿
 
 ![エディタ](docs/screenshots/desktop-editor.jpg)
 
@@ -34,7 +34,9 @@ rise tech solutions 社内ナレッジ共有サイト（社内限定）。
 
 ## 主な機能
 
-- 記事の投稿（Markdown・テンプレート・画像・タグ・自動保存）、一覧・タグ別・日本語全文検索
+- 記事の投稿（Markdown・テンプレート・画像・タグ・自動保存）、日本語全文検索
+- 分類：大分類（開発 / インフラ / キャリア・働き方）＋ 軸ごとの属性（工程・言語・製品など）＋ 自由タグ。
+  軸をかけ合わせて絞り込める（[docs/design/taxonomy.md](docs/design/taxonomy.md)）
 - 承認フロー：下書き → AI チェック → 管理者の確認 → 公開。自分の記事は承認できない。AI が自動で公開することはない
 - 公開後に編集しても、新しい版が承認されるまでは公開中の内容を表示し続ける
 - イニシャル表示での投稿（ほかの社員には実名を出さない）

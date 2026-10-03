@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/server/auth/guards";
 import { findTag, listPublishedArticles } from "@/server/articles/queries";
-import { ArticleList } from "@/components/articles/article-list";
+import { ArticleCards } from "@/components/articles/article-cards";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination, parsePage } from "@/components/ui/pagination";
@@ -24,7 +24,7 @@ export default async function TagPage({ params, searchParams }: PageProps<"/tags
     <div className="mx-auto max-w-3xl">
       <PageHeader title={`#${tag.displayName}`} description={`公開中の記事 ${result.total} 件`} />
       {result.items.length > 0 ? (
-        <ArticleList articles={result.items} />
+        <ArticleCards articles={result.items} />
       ) : (
         <EmptyState title="このタグの公開記事はまだありません" />
       )}

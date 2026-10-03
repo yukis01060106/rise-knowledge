@@ -27,6 +27,7 @@ export type PendingReview = {
   submittedAt: Date | null;
   aiCheckFailed: boolean;
   showInitials: boolean;
+  category: "dev" | "infra" | "career" | null;
   /** 公開済みの記事の更新か（初回公開でなければ true） */
   isUpdate: boolean;
   author: { id: string; name: string | null; department: "dev" | "infra" | null };
@@ -47,6 +48,7 @@ export async function listPendingReviews(viewer: AdminViewer): Promise<PendingRe
       submittedAt: true,
       aiCheckFailed: true,
       showInitials: true,
+      category: true,
       article: {
         select: { publishedVersionId: true, author: { select: { id: true, name: true, department: true } } },
       },
@@ -60,6 +62,7 @@ export async function listPendingReviews(viewer: AdminViewer): Promise<PendingRe
     submittedAt: r.submittedAt,
     aiCheckFailed: r.aiCheckFailed,
     showInitials: r.showInitials,
+    category: r.category,
     isUpdate: r.article.publishedVersionId !== null,
     author: r.article.author,
   }));
@@ -79,6 +82,8 @@ const reviewVersionSelect = {
   status: true,
   aiCheckFailed: true,
   showInitials: true,
+  category: true,
+  facets: true,
   submittedAt: true,
   decidedAt: true,
   rejectReason: true,

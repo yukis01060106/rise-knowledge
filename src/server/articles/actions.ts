@@ -8,6 +8,7 @@ import { writeAuditLog } from "@/server/audit/log";
 import { parseTags } from "@/lib/tags";
 import { SUBMITTED_STATUSES } from "@/lib/labels";
 import { MAX_BODY_LENGTH, MAX_TITLE_LENGTH } from "@/lib/articles";
+import { CATEGORY_KEYS, parseFacets } from "@/lib/taxonomy";
 
 const saveSchema = z.object({
   articleId: z.uuid().nullable(),
@@ -16,6 +17,9 @@ const saveSchema = z.object({
   tags: z.array(z.string().max(200)).max(50),
   /** 著者名をイニシャルで表示する（設定画面でイニシャルを登録していること） */
   showInitials: z.boolean().default(false),
+  /** 大分類と属性（下書きの間は未設定でもよい。申請時に大分類を必須にする） */
+  category: z.enum(CATEGORY_KEYS).nullable().default(null),
+  facets: z.array(z.string().max(60)).max(50).default([]),
   /** 編集を始めたときの版の更新日時。別のタブなどで先に保存されていたら上書きしない */
   expectedUpdatedAt: z.iso.datetime().nullable(),
 });
@@ -56,7 +60,10 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
   if (!parsed.success) return { ok: false, code: "invalid", message: parsed.error.issues[0]?.message ?? "入力が不正です" };
   const tags = parseTags(parsed.data.tags);
   if (!tags.ok) return { ok: false, code: "invalid", message: tags.message };
-  const { articleId, title, bodyMd, expectedUpdatedAt, showInitials } = parsed.data;
+  const { articleId, title, bodyMd, expectedUpdatedAt, showInitials, category } = parsed.data;
+  const facetResult = parseFacets(category, parsed.data.facets);
+  if (!facetResult.ok) return { ok: false, code: "invalid", message: facetResult.message };
+  const facets = facetResult.facets;
   if (showInitials && !user.initials) {
     return { ok: false, code: "invalid", message: "イニシャル表示にするには、先に設定画面でイニシャルを登録してください" };
   }
@@ -66,7 +73,7 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
       if (!articleId) {
         const article = await tx.article.create({ data: { authorId: user.id }, select: { id: true } });
         const version = await tx.articleVersion.create({
-          data: { articleId: article.id, versionNo: 1, title, bodyMd, showInitials, createdBy: user.id },
+          data: { articleId: article.id, versionNo: 1, title, bodyMd, showInitials, category, facets, createdBy: user.id },
           select: { id: true, versionNo: true, updatedAt: true },
         });
         await replaceTags(tx, version.id, tags.tags);
@@ -101,7 +108,7 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
         if (expectedUpdatedAt && latest.updatedAt.toISOString() !== expectedUpdatedAt) return CONFLICT;
         const version = await tx.articleVersion.update({
           where: { id: latest.id },
-          data: { title, bodyMd, showInitials },
+          data: { title, bodyMd, showInitials, category, facets },
           select: { id: true, versionNo: true, updatedAt: true },
         });
         await replaceTags(tx, version.id, tags.tags);
@@ -119,6 +126,8 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
           title,
           bodyMd,
           showInitials,
+          category,
+          facets,
           createdBy: user.id,
           basedOnVersionId,
         },

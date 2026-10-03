@@ -1,6 +1,6 @@
 import { requireUser } from "@/server/auth/guards";
 import { searchPublishedArticles } from "@/server/articles/queries";
-import { ArticleList } from "@/components/articles/article-list";
+import { ArticleCards } from "@/components/articles/article-cards";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination, parsePage } from "@/components/ui/pagination";
@@ -36,7 +36,7 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
       </form>
       {result &&
         (result.items.length > 0 ? (
-          <ArticleList articles={result.items} />
+          <ArticleCards articles={result.items} />
         ) : (
           <EmptyState title="見つかりませんでした">別のことばや、短いことばで試してみてください。</EmptyState>
         ))}

@@ -5,12 +5,14 @@ type Props = {
   pageCount: number;
   /** ページ番号以外のクエリ（検索語・絞り込み） */
   basePath: string;
-  params?: Record<string, string | undefined>;
+  params?: Record<string, string | string[] | undefined>;
 };
 
 function hrefFor(basePath: string, params: Props["params"], page: number) {
   const sp = new URLSearchParams();
-  for (const [k, v] of Object.entries(params ?? {})) if (v) sp.set(k, v);
+  for (const [k, v] of Object.entries(params ?? {})) {
+    for (const one of Array.isArray(v) ? v : v ? [v] : []) sp.append(k, one);
+  }
   if (page > 1) sp.set("page", String(page));
   const qs = sp.toString();
   return qs ? `${basePath}?${qs}` : basePath;

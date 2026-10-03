@@ -40,6 +40,8 @@ export default async function EditArticlePage({ params }: PageProps<"/articles/[
       initialUpdatedAt={isDraft ? working.updatedAt.toISOString() : null}
       editingPublished={!working && published !== null}
       initialShowInitials={source.showInitials}
+      initialCategory={source.category}
+      initialFacets={source.facets}
       myInitials={user.initials}
       rejection={working?.status === "rejected" ? { versionNo: working.versionNo, reason: working.rejectReason } : null}
     />

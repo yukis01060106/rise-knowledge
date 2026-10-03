@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -18,11 +19,11 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
 
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
+      <header className="glass sticky top-0 z-20 border-b border-white/60 shadow-[0_1px_0_rgb(15_35_70/0.06)]">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5">
           <Link href="/" className="flex items-center gap-2 font-bold text-brand-strong">
             <Image src="/brand/logo.png" alt="" width={30} height={28} priority />
-            <span className="hidden sm:inline">rise ナレッジ</span>
+            <span className="brand-text hidden text-lg tracking-tight sm:inline">rise ナレッジ</span>
           </Link>
           <form action="/search" role="search" className="ml-auto hidden w-72 md:block">
             <label htmlFor="header-search" className="sr-only">
@@ -33,16 +34,18 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
               name="q"
               type="search"
               placeholder="記事を検索"
-              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:border-brand focus:bg-surface focus:outline-none"
+              className="w-full rounded-full border border-border bg-surface/80 px-4 py-1.5 text-sm focus:border-brand focus:bg-surface focus:outline-none"
             />
           </form>
           <div className="ml-auto flex items-center gap-2 md:ml-0">
-            <Link href="/articles/new" className={buttonClass("primary", "sm")}>
+            <Link href="/articles/new" className={buttonClass("primary", "sm", "brand-gradient rounded-full px-3.5 shadow-sm")}>
               記事を書く
             </Link>
             <UserMenu name={user.name} email={user.email} department={user.department} role={user.role} />
             {/* 右利きの人が多いため、メニューは右側に置く */}
-            <MobileNav isAdmin={isAdmin} pendingReviews={pendingReviews} />
+            <Suspense>
+              <MobileNav isAdmin={isAdmin} pendingReviews={pendingReviews} />
+            </Suspense>
           </div>
         </div>
       </header>
@@ -50,7 +53,9 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
         {/* メニューは右側（右利きの人が多いため）。読み上げ順ではメニューを先にする */}
         <aside className="hidden lg:order-last lg:block">
           <div className="sticky top-16 py-8">
-            <SideNav isAdmin={isAdmin} pendingReviews={pendingReviews} />
+            <Suspense>
+              <SideNav isAdmin={isAdmin} pendingReviews={pendingReviews} />
+            </Suspense>
           </div>
         </aside>
         <main className="min-w-0 py-8">{children}</main>

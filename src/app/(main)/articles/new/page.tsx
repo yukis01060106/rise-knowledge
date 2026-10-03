@@ -13,6 +13,8 @@ export default async function NewArticlePage() {
       editingPublished={false}
       rejection={null}
       initialShowInitials={false}
+      initialCategory={user.department}
+      initialFacets={[]}
       myInitials={user.initials}
     />
   );

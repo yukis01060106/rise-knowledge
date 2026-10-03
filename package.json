@@ -14,8 +14,8 @@
     "db:migrate": "prisma migrate dev",
     "admin:grant": "tsx scripts/grant-admin.ts",
     "db:seed:dev": "tsx scripts/seed-dev.ts",
-    "demo:css": "tailwindcss -i demo/styles.src.css -o demo/styles.css --minify",
-    "demo:publish": "npm run demo:css && git subtree split --prefix demo -b gh-pages && git push -f origin gh-pages && git branch -D gh-pages"
+    "demo:publish": "npm run demo:build && git subtree split --prefix demo -b gh-pages && git push -f origin gh-pages && git branch -D gh-pages",
+    "demo:build": "tsx scripts/build-demo-data.ts && tailwindcss -i demo/styles.src.css -o demo/styles.css --minify"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",

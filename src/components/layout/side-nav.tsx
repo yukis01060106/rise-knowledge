@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { CategoryIcon } from "@/components/ui/category-badge";
+import { CATEGORIES } from "@/lib/taxonomy";
 import type { ReactNode } from "react";
 
-type Item = { href: string; label: string; icon: ReactNode; match: (p: string) => boolean; badge?: number };
+type Item = { href: string; label: string; icon: ReactNode; match: (p: string, q: URLSearchParams) => boolean; badge?: number };
 type Section = { title?: string; items: Item[] };
 
 const icon = (d: string) => (
@@ -36,11 +38,24 @@ function sections(isAdmin: boolean, pendingReviews: number): Section[] {
           href: "/articles",
           label: "記事",
           icon: ICONS.articles,
-          match: (p) => p === "/articles" || /^\/articles\/[^/]+$/.test(p),
+          match: (p, q) => (p === "/articles" && !q.get("cat")) || /^\/articles\/[^/]+$/.test(p),
         },
         { href: "/tags", label: "タグ", icon: ICONS.tags, match: (p) => p.startsWith("/tags") },
         { href: "/search", label: "検索", icon: ICONS.search, match: (p) => p.startsWith("/search") },
       ],
+    },
+    {
+      title: "分類",
+      items: CATEGORIES.map((c) => ({
+        href: `/articles?cat=${c.key}`,
+        label: c.label,
+        icon: (
+          <span className={`cat-${c.key} cat-gradient inline-flex size-5 shrink-0 items-center justify-center rounded-md text-white`}>
+            <CategoryIcon category={c.key} className="size-3.5" />
+          </span>
+        ),
+        match: (p: string, q: URLSearchParams) => p === "/articles" && q.get("cat") === c.key,
+      })),
     },
     {
       title: "自分",
@@ -70,6 +85,7 @@ export type SideNavProps = { isAdmin: boolean; pendingReviews: number; onNavigat
 /** メインメニュー。PC では右のサイドバー、スマホではドロワーの中に表示する */
 export function SideNav({ isAdmin, pendingReviews, onNavigate }: SideNavProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   return (
     <nav aria-label="メインメニュー" className="space-y-5">
       {sections(isAdmin, pendingReviews).map((section, i) => (
@@ -77,17 +93,20 @@ export function SideNav({ isAdmin, pendingReviews, onNavigate }: SideNavProps) {
           {section.title && <p className="mb-1 px-3 text-xs font-semibold tracking-wide text-muted">{section.title}</p>}
           <ul className="space-y-0.5">
             {section.items.map((item) => {
-              const active = item.match(pathname);
+              const active = item.match(pathname, searchParams);
               return (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     onClick={onNavigate}
                     aria-current={active ? "page" : undefined}
-                    className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                      active ? "bg-brand-soft text-brand-strong" : "text-foreground/80 hover:bg-surface hover:text-foreground"
+                    className={`relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                      active
+                        ? "bg-surface text-brand-strong shadow-sm ring-1 ring-border"
+                        : "text-foreground/75 hover:bg-surface/70 hover:text-foreground"
                     }`}
                   >
+                    {active && <span aria-hidden className="brand-gradient absolute inset-y-2 -left-0.5 w-1 rounded-full" />}
                     {item.icon}
                     <span className="flex-1">{item.label}</span>
                     {item.badge ? (

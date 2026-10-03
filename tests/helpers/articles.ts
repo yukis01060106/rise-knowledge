@@ -2,7 +2,14 @@ import { prisma } from "@/server/db";
 import { parseTags } from "@/lib/tags";
 import type { VersionStatus } from "@/generated/prisma/enums";
 
-type Input = { title?: string; body?: string; tags?: string[]; publishedAt?: Date };
+type Input = {
+  title?: string;
+  body?: string;
+  tags?: string[];
+  publishedAt?: Date;
+  category?: "dev" | "infra" | "career" | null;
+  facets?: string[];
+};
 
 /** draft から指定の状態まで、DB のトリガーが許す順に進める（テストの準備用） */
 const PATH: Record<VersionStatus, VersionStatus[]> = {
@@ -36,6 +43,9 @@ async function createVersion(articleId: string, authorId: string, versionNo: num
       versionNo,
       title: input.title ?? "記事",
       bodyMd: input.body ?? "本文",
+      // 申請には大分類が必要なので、指定がなければ開発にする
+      category: input.category === undefined ? "dev" : input.category,
+      facets: input.facets ?? [],
       createdBy: authorId,
     },
   });

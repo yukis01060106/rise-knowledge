@@ -1,9 +1,9 @@
 import type { Department } from "@/generated/prisma/enums";
 
 const COLORS: Record<Department | "none", string> = {
-  dev: "bg-brand",
-  infra: "bg-slate-500",
-  none: "bg-gray-400",
+  dev: "bg-gradient-to-br from-brand-light to-brand-strong",
+  infra: "bg-gradient-to-br from-slate-400 to-slate-700",
+  none: "bg-gradient-to-br from-gray-300 to-gray-500",
 };
 
 /** 名前の頭文字のアバター（プロフィール画像は持たない）。色は部署ごと */

@@ -1,9 +1,11 @@
 import "server-only";
 import { Prisma } from "@/generated/prisma/client";
-import type { Department, Role, VersionStatus } from "@/generated/prisma/enums";
+import type { ArticleCategory, Department, Role, VersionStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/server/db";
 import { normalizeTagName } from "@/lib/tags";
 import { isWorkingStatus } from "@/lib/labels";
+import { CATEGORY_KEYS, describeFacets, groupFilter, type CategoryKey, type FacetLabel } from "@/lib/taxonomy";
+import { excerptOf, readingMinutes } from "@/lib/excerpt";
 
 /**
  * 記事の取得はかならずこのモジュールを通す（誰が・どの版を見てよいかをここで判定する）。
@@ -29,7 +31,10 @@ const cardSelect = {
   publishedVersion: {
     select: {
       title: true,
+      bodyMd: true,
       showInitials: true,
+      category: true,
+      facets: true,
       tags: { select: { tag: { select: { name: true, displayName: true } } } },
     },
   },
@@ -53,6 +58,10 @@ export function toPublicAuthor(
 export type ArticleCard = {
   id: string;
   title: string;
+  excerpt: string;
+  readingMinutes: number;
+  category: CategoryKey | null;
+  facets: FacetLabel[];
   firstPublishedAt: Date | null;
   author: PublicAuthor;
   tags: { name: string; displayName: string }[];
@@ -62,6 +71,10 @@ function toCard(row: CardRow): ArticleCard {
   return {
     id: row.id,
     title: row.publishedVersion?.title ?? "",
+    excerpt: excerptOf(row.publishedVersion?.bodyMd ?? ""),
+    readingMinutes: readingMinutes(row.publishedVersion?.bodyMd ?? ""),
+    category: row.publishedVersion?.category ?? null,
+    facets: describeFacets(row.publishedVersion?.category, row.publishedVersion?.facets ?? []),
     firstPublishedAt: row.firstPublishedAt,
     author: toPublicAuthor(row.author, row.publishedVersion?.showInitials ?? false),
     tags: row.publishedVersion?.tags.map((t) => t.tag) ?? [],
@@ -74,18 +87,32 @@ function pageOf<T>(items: T[], total: number, page: number): Page<T> {
   return { items, total, page, pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
 }
 
-/** 公開中の記事を新着順に返す。部署・タグで絞り込める */
+/**
+ * 公開中の記事を新着順に返す。大分類・属性・タグ・著者の部署で絞り込める。
+ * 属性は同じ軸の中は「どれか」、軸どうしは「すべて」を満たすもの。
+ */
 export async function listPublishedArticles(
-  opts: { department?: Department; tagName?: string; page?: number; pageSize?: number } = {},
+  opts: {
+    category?: CategoryKey;
+    facets?: string[];
+    department?: Department;
+    tagName?: string;
+    page?: number;
+    pageSize?: number;
+  } = {},
 ): Promise<Page<ArticleCard>> {
   const page = Math.max(1, opts.page ?? 1);
   const take = opts.pageSize ?? PAGE_SIZE;
+  const version: Prisma.ArticleVersionWhereInput = {
+    ...(opts.category && { category: opts.category }),
+    ...(opts.tagName && { tags: { some: { tag: { name: normalizeTagName(opts.tagName) } } } }),
+  };
+  const groups = groupFilter(opts.category, opts.facets ?? []);
+  if (groups.length > 0) version.AND = groups.map((g) => ({ facets: { hasSome: g } }));
   const where: Prisma.ArticleWhereInput = {
     ...visiblePublished,
     ...(opts.department && { author: { department: opts.department } }),
-    ...(opts.tagName && {
-      publishedVersion: { tags: { some: { tag: { name: normalizeTagName(opts.tagName) } } } },
-    }),
+    ...(Object.keys(version).length > 0 && { publishedVersion: version }),
   };
   const [rows, total] = await Promise.all([
     prisma.article.findMany({
@@ -182,6 +209,8 @@ const versionSelect = {
   bodyMd: true,
   status: true,
   showInitials: true,
+  category: true,
+  facets: true,
   submittedAt: true,
   rejectReason: true,
   createdAt: true,
@@ -337,4 +366,28 @@ export async function listMyArticles(viewer: Viewer, tab: MyArticleTab) {
     number
   >;
   return { items: all.filter((r) => inTab(r, tab)), countByTab };
+}
+
+/** 大分類ごとの公開記事数（トップの「分類から探す」用） */
+export async function countByCategory(): Promise<Record<CategoryKey, number>> {
+  const rows = await prisma.$queryRaw<{ category: ArticleCategory; count: bigint }[]>`
+    SELECT v.category, count(*) AS count
+    FROM articles a JOIN article_versions v ON v.id = a.published_version_id
+    WHERE a.hidden_at IS NULL AND v.category IS NOT NULL
+    GROUP BY v.category`;
+  const out = Object.fromEntries(CATEGORY_KEYS.map((k) => [k, 0])) as Record<CategoryKey, number>;
+  for (const r of rows) out[r.category] = Number(r.count);
+  return out;
+}
+
+/** 大分類の中で、属性ごとの公開記事数（絞り込みの選択肢に件数を出すため） */
+export async function countFacets(category: CategoryKey): Promise<Record<string, number>> {
+  const rows = await prisma.$queryRaw<{ facet: string; count: bigint }[]>`
+    SELECT f AS facet, count(*) AS count
+    FROM articles a
+    JOIN article_versions v ON v.id = a.published_version_id
+    CROSS JOIN LATERAL unnest(v.facets) AS f
+    WHERE a.hidden_at IS NULL AND v.category = ${category}::"ArticleCategory"
+    GROUP BY f`;
+  return Object.fromEntries(rows.map((r) => [r.facet, Number(r.count)]));
 }
