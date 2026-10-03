@@ -140,6 +140,10 @@ npm run db:seed:dev         # 動作確認用の架空ユーザーと公開記�
   `lower()` の式インデックスを張っている。Prisma は式インデックスを無視するので消されない）
 - 部分インデックスなど Prisma で表せない索引を足したら、`prisma migrate diff --from-config-datasource
   --to-schema prisma/schema.prisma --script` が空になることを確認する
+- 版の状態と記事の公開状態は `src/server/workflow/` だけで変える。DB のトリガーも不正な遷移・
+  審査済みの版の変更・draft 以外での版の新規作成を拒否する（テストの準備は `tests/helpers/articles.ts`
+  の `advanceVersion` で正規の順に進める）
+- 管理者向けの取得は `src/server/articles/admin-queries.ts`（ロールを関数の中でも確認する）
 - 記事の取得は `src/server/articles/queries.ts` を通す。Markdown の表示は `renderMarkdown()`
   （サニタイズ済みの `SanitizedHtml` を返す）だけを `dangerouslySetInnerHTML` に渡す
 - 画像は `/api/images/[id]` でログインを確認してから配信する。Markdown の画像はこの URL だけを表示し、

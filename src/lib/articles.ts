@@ -55,3 +55,5 @@ export const ARTICLE_TEMPLATES = [
 `,
   },
 ] as const;
+/** 差し戻し・非公開の理由の上限 */
+export const MAX_REASON_LENGTH = 1000;

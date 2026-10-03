@@ -1,7 +1,7 @@
 /**
  * 開発環境用のシード。動作確認用に、架空のユーザーと公開済みの記事を作る。
- * フェーズ 2 の時点では承認フローがなく公開記事を作れないため（docs/design/roadmap.md）、
- * ここでだけ published の版を直接作る。アプリのコードでは状態を直接書き換えないこと。
+ * 承認には別の管理者が必要で手間がかかるため、ここでだけ版の状態を直接進めて公開記事を作る
+ * （DB のトリガーが許す順に進める）。アプリのコードでは状態を直接書き換えないこと。
  *
  *   npm run db:seed:dev
  */
@@ -190,23 +190,17 @@ async function main() {
 
       await prisma.$transaction(async (tx) => {
         const article = await tx.article.create({ data: { authorId, createdAt: at } });
+        // 新しい版は DB のトリガーで draft からしか作れないため、正規の遷移の順に進める
         const version = await tx.articleVersion.create({
-          data: {
-            articleId: article.id,
-            versionNo: 1,
-            title: a.title,
-            bodyMd: a.body,
-            status: "published",
-            createdBy: authorId,
-            submittedAt: at,
-            decidedAt: at,
-            createdAt: at,
-          },
+          data: { articleId: article.id, versionNo: 1, title: a.title, bodyMd: a.body, createdBy: authorId, createdAt: at },
         });
         for (const t of tags.tags) {
           const tag = await tx.tag.upsert({ where: { name: t.name }, update: {}, create: t });
           await tx.versionTag.create({ data: { versionId: version.id, tagId: tag.id } });
         }
+        await tx.articleVersion.update({ where: { id: version.id }, data: { status: "ai_review", submittedAt: at } });
+        await tx.articleVersion.update({ where: { id: version.id }, data: { status: "admin_review" } });
+        await tx.articleVersion.update({ where: { id: version.id }, data: { status: "published", decidedAt: at } });
         await tx.article.update({
           where: { id: article.id },
           data: { publishedVersionId: version.id, firstPublishedAt: at },

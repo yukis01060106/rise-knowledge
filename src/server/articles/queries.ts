@@ -1,19 +1,20 @@
 import "server-only";
 import { Prisma } from "@/generated/prisma/client";
-import type { Department, VersionStatus } from "@/generated/prisma/enums";
+import type { Department, Role, VersionStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/server/db";
 import { normalizeTagName } from "@/lib/tags";
-import { WORKING_STATUSES } from "@/lib/labels";
+import { isWorkingStatus } from "@/lib/labels";
 
 /**
  * 記事の取得はかならずこのモジュールを通す（誰が・どの版を見てよいかをここで判定する）。
  * - 公開中の版：ログインしている全員（緊急非公開の記事は除く）
  * - 作業中の版（draft / ai_review / admin_review / rejected）：著者だけ
+ *   （admin が審査中の版を見るのは src/server/articles/admin-queries.ts から）
  */
 
 export const PAGE_SIZE = 20;
 
-type Viewer = { id: string };
+type Viewer = { id: string; role?: Role };
 
 /** 一覧に出してよい記事（公開中かつ非公開化されていない） */
 const visiblePublished = {
@@ -192,11 +193,8 @@ async function loadArticle(id: string) {
       hiddenAt: true,
       author: { select: { id: true, name: true, department: true } },
       publishedVersion: { select: versionSelect },
-      versions: {
-        where: { status: { in: [...WORKING_STATUSES] } },
-        select: versionSelect,
-        take: 1,
-      },
+      // 最新の版。作業中（draft / 審査中 / 差し戻し）かどうかは状態で判断する
+      versions: { orderBy: { versionNo: "desc" }, select: versionSelect, take: 1 },
     },
   });
 }
@@ -206,32 +204,48 @@ export type ArticleDetail = {
   author: { id: string; name: string | null; department: Department | null };
   firstPublishedAt: Date | null;
   hidden: boolean;
+  /** 緊急非公開の理由（著者と admin にだけ返す） */
+  hiddenReason: string | null;
   isAuthor: boolean;
   /** 公開中の版（著者以外にはこれだけが見える） */
   published: VersionView | null;
-  /** 作業中の版。著者にだけ返す */
+  /** 作業中の版（draft / ai_review / admin_review / rejected）。著者にだけ返す */
   working: VersionView | null;
 };
 
+async function latestHiddenReason(articleId: string) {
+  const log = await prisma.auditLog.findFirst({
+    where: { articleId, action: "article_hidden" },
+    orderBy: { id: "desc" },
+    select: { reason: true },
+  });
+  return log?.reason ?? null;
+}
+
 /**
  * 記事詳細。見てよい記事でなければ null を返す（存在するかどうかも知らせない）。
- * 著者以外：公開中かつ非公開化されていない記事の公開中の版だけ。
+ * - 著者以外：公開中の版だけ。緊急非公開の記事は admin だけが見られる
+ * - 作業中の版は著者だけ（admin が審査中の版を見るのはレビュー画面から）
  */
 export async function getArticleDetail(viewer: Viewer, id: string): Promise<ArticleDetail | null> {
   const article = await loadArticle(id);
   if (!article) return null;
   const isAuthor = article.authorId === viewer.id;
-  const visibleToOthers = article.publishedVersion !== null && article.hiddenAt === null;
-  if (!isAuthor && !visibleToOthers) return null;
+  const isAdmin = viewer.role === "admin";
+  const hidden = article.hiddenAt !== null;
+  const visible = isAuthor || (article.publishedVersion !== null && (!hidden || isAdmin));
+  if (!visible) return null;
 
+  const latest = article.versions[0];
   return {
     id: article.id,
     author: article.author,
     firstPublishedAt: article.firstPublishedAt,
-    hidden: article.hiddenAt !== null,
+    hidden,
+    hiddenReason: hidden ? await latestHiddenReason(article.id) : null,
     isAuthor,
     published: article.publishedVersion ? toVersionView(article.publishedVersion) : null,
-    working: isAuthor && article.versions[0] ? toVersionView(article.versions[0]) : null,
+    working: isAuthor && latest && isWorkingStatus(latest.status) ? toVersionView(latest) : null,
   };
 }
 
@@ -244,59 +258,65 @@ export async function getArticleForEdit(viewer: Viewer, id: string) {
 export const MY_ARTICLE_TABS = ["draft", "review", "rejected", "published"] as const;
 export type MyArticleTab = (typeof MY_ARTICLE_TABS)[number];
 
-const TAB_STATUSES: Record<Exclude<MyArticleTab, "published">, VersionStatus[]> = {
-  draft: ["draft"],
-  review: ["ai_review", "admin_review"],
-  rejected: ["rejected"],
-};
-
 export type MyArticleRow = {
   id: string;
   title: string;
   updatedAt: Date;
-  working: { status: VersionStatus; versionNo: number; updatedAt: Date } | null;
+  working: { status: VersionStatus; versionNo: number; updatedAt: Date; rejectReason: string | null } | null;
   published: boolean;
   hidden: boolean;
 };
 
-/** 自分の記事を状態のタブごとに返す。タブごとの件数も返す */
+function tabOf(row: MyArticleRow): MyArticleTab | null {
+  switch (row.working?.status) {
+    case "draft":
+      return "draft";
+    case "ai_review":
+    case "admin_review":
+      return "review";
+    case "rejected":
+      return "rejected";
+    default:
+      return null;
+  }
+}
+
+/** 自分の記事を状態のタブごとに返す。タブごとの件数も返す（作業中の版の状態は最新の版で決まる） */
 export async function listMyArticles(viewer: Viewer, tab: MyArticleTab) {
-  const whereFor = (t: MyArticleTab): Prisma.ArticleWhereInput =>
-    t === "published"
-      ? { authorId: viewer.id, publishedVersionId: { not: null } }
-      : { authorId: viewer.id, versions: { some: { status: { in: TAB_STATUSES[t] } } } };
-
-  const [rows, ...counts] = await Promise.all([
-    prisma.article.findMany({
-      where: whereFor(tab),
-      orderBy: { updatedAt: "desc" },
-      take: 100,
-      select: {
-        id: true,
-        updatedAt: true,
-        hiddenAt: true,
-        publishedVersion: { select: { title: true } },
-        versions: {
-          where: { status: { in: [...WORKING_STATUSES] } },
-          select: { status: true, versionNo: true, title: true, updatedAt: true },
-          take: 1,
-        },
+  const rows = await prisma.article.findMany({
+    where: { authorId: viewer.id },
+    orderBy: { updatedAt: "desc" },
+    take: 500,
+    select: {
+      id: true,
+      updatedAt: true,
+      hiddenAt: true,
+      publishedVersion: { select: { title: true } },
+      versions: {
+        orderBy: { versionNo: "desc" },
+        select: { status: true, versionNo: true, title: true, updatedAt: true, rejectReason: true },
+        take: 1,
       },
-    }),
-    ...MY_ARTICLE_TABS.map((t) => prisma.article.count({ where: whereFor(t) })),
-  ]);
+    },
+  });
 
-  const items: MyArticleRow[] = rows.map((r) => {
-    const w = r.versions[0];
+  const all: MyArticleRow[] = rows.map((r) => {
+    const latest = r.versions[0];
+    const w = latest && isWorkingStatus(latest.status) ? latest : null;
     return {
       id: r.id,
       title: w?.title || r.publishedVersion?.title || "",
       updatedAt: w?.updatedAt ?? r.updatedAt,
-      working: w ? { status: w.status, versionNo: w.versionNo, updatedAt: w.updatedAt } : null,
+      working: w ? { status: w.status, versionNo: w.versionNo, updatedAt: w.updatedAt, rejectReason: w.rejectReason } : null,
       published: r.publishedVersion !== null,
       hidden: r.hiddenAt !== null,
     };
   });
-  const countByTab = Object.fromEntries(MY_ARTICLE_TABS.map((t, i) => [t, counts[i]])) as Record<MyArticleTab, number>;
-  return { items, countByTab };
+
+  const inTab = (row: MyArticleRow, t: MyArticleTab) => (t === "published" ? row.published : tabOf(row) === t);
+  const countByTab = Object.fromEntries(MY_ARTICLE_TABS.map((t) => [t, all.filter((r) => inTab(r, t)).length])) as Record<
+    MyArticleTab,
+    number
+  >;
+  return { items: all.filter((r) => inTab(r, tab)), countByTab };
 }

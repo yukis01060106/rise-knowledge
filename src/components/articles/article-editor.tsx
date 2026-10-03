@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { saveDraft } from "@/server/articles/actions";
+import { discardDraftAction, submitReviewAction } from "@/server/workflow/actions";
 import { buttonClass } from "@/components/ui/button";
 import { ARTICLE_TEMPLATES, MAX_BODY_LENGTH, MAX_TITLE_LENGTH } from "@/lib/articles";
 import { MAX_TAGS } from "@/lib/tags";
@@ -16,6 +18,8 @@ type Props = {
   initialUpdatedAt: string | null;
   /** 公開済みの記事を編集しているか（保存すると新しい版になる） */
   editingPublished: boolean;
+  /** 差し戻された版を修正しているとき、その版番号と理由 */
+  rejection: { versionNo: number; reason: string | null } | null;
 };
 
 type SaveState =
@@ -40,6 +44,9 @@ export function ArticleEditor(props: Props) {
   const [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
   const [uploading, setUploading] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  const [hasDraft, setHasDraft] = useState(props.initialUpdatedAt !== null);
+  const [busy, setBusy] = useState<"submit" | "discard" | null>(null);
+  const router = useRouter();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -73,6 +80,7 @@ export function ArticleEditor(props: Props) {
       });
       if (result.ok) {
         updatedAtRef.current = result.updatedAt;
+        setHasDraft(true);
         if (!articleIdRef.current) {
           articleIdRef.current = result.articleId;
           setArticleId(result.articleId);
@@ -115,6 +123,51 @@ export function ArticleEditor(props: Props) {
       savingRef.current = false;
     }
   }, [saveOnce]);
+
+  /** レビュー申請。未保存の変更があれば先に保存する */
+  async function submitForReview() {
+    if (!confirm("レビューを申請しますか？申請中は編集できません。")) return;
+    setBusy("submit");
+    setNotice(null);
+    try {
+      while (savingRef.current) await new Promise((r) => setTimeout(r, 100));
+      // 作業中の下書きがまだない（公開版・差し戻し版を開いただけ）ときも、保存して新しい版を作る
+      if (dirtyRef.current || !updatedAtRef.current) await save();
+      if (blockedRef.current || dirtyRef.current || !articleIdRef.current) {
+        if (!articleIdRef.current) setNotice("タイトルと本文を入力してください");
+        return;
+      }
+      const result = await submitReviewAction(articleIdRef.current);
+      if (!result?.ok) {
+        setNotice(result?.message ?? "レビューを申請できませんでした");
+        return;
+      }
+      blockedRef.current = true;
+      router.push("/me/articles?tab=review");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** 下書きの破棄 */
+  async function discard() {
+    const id = articleIdRef.current;
+    if (!id || !confirm("この下書きを破棄しますか？元に戻せません。")) return;
+    setBusy("discard");
+    try {
+      while (savingRef.current) await new Promise((r) => setTimeout(r, 100));
+      const result = await discardDraftAction(id);
+      if (!result?.ok) {
+        setNotice(result?.message ?? "破棄できませんでした");
+        return;
+      }
+      blockedRef.current = true;
+      dirtyRef.current = false;
+      router.push(result.articleDeleted ? "/me/articles" : `/articles/${id}`);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   // 自動保存：最後の入力から少し待って保存する
   useEffect(() => {
@@ -233,6 +286,13 @@ export function ArticleEditor(props: Props) {
         }
       }}
     >
+      {props.rejection && (
+        <div role="status" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <p className="font-semibold">v{props.rejection.versionNo} は差し戻されました。修正して、もう一度レビューを申請してください。</p>
+          {props.rejection.reason && <p className="mt-1 whitespace-pre-wrap">理由：{props.rejection.reason}</p>}
+          <p className="mt-1 text-xs">保存すると新しい版として下書きになります（差し戻された版はそのまま残ります）。</p>
+        </div>
+      )}
       {props.editingPublished && (
         <p className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm text-sky-900">
           公開中の記事を編集しています。保存すると新しい版として下書きになり、公開中の内容は承認されるまでそのまま表示されます。
@@ -387,7 +447,12 @@ export function ArticleEditor(props: Props) {
           {statusText}
         </p>
         <span className="text-xs text-muted">{body.length.toLocaleString()} 文字</span>
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex flex-wrap gap-2">
+          {articleId && hasDraft && (
+            <button type="button" onClick={() => void discard()} disabled={busy !== null} className={buttonClass("ghost", "md", "text-danger")}>
+              下書きを破棄
+            </button>
+          )}
           {articleId && (
             <Link href={`/articles/${articleId}`} className={buttonClass("ghost", "md")}>
               記事ページで確認
@@ -396,10 +461,18 @@ export function ArticleEditor(props: Props) {
           <button
             type="button"
             onClick={() => void save()}
-            disabled={saveState.kind === "saving"}
-            className={buttonClass("primary", "md")}
+            disabled={saveState.kind === "saving" || busy !== null}
+            className={buttonClass("secondary", "md")}
           >
             下書き保存
+          </button>
+          <button
+            type="button"
+            onClick={() => void submitForReview()}
+            disabled={busy !== null}
+            className={buttonClass("primary", "md")}
+          >
+            {busy === "submit" ? "申請中…" : "レビュー申請"}
           </button>
         </div>
       </div>

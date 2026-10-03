@@ -11,6 +11,7 @@ export default async function NewArticlePage() {
       initialTags={[]}
       initialUpdatedAt={null}
       editingPublished={false}
+      rejection={null}
     />
   );
 }

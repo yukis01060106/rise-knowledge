@@ -6,7 +6,7 @@ import { prisma, type Tx } from "@/server/db";
 import { requireUser } from "@/server/auth/guards";
 import { writeAuditLog } from "@/server/audit/log";
 import { parseTags } from "@/lib/tags";
-import { SUBMITTED_STATUSES, WORKING_STATUSES } from "@/lib/labels";
+import { SUBMITTED_STATUSES } from "@/lib/labels";
 import { MAX_BODY_LENGTH, MAX_TITLE_LENGTH } from "@/lib/articles";
 
 const saveSchema = z.object({
@@ -42,8 +42,9 @@ async function replaceTags(tx: Tx, versionId: string, tags: { name: string; disp
 /**
  * 下書きを保存する（自動保存もこれを呼ぶ）。
  * - articleId なし：記事と最初の版（draft）を作る
- * - 作業中の版が draft：その版を上書きする
- * - 作業中の版がない（公開済みの記事を編集）：公開中の版をもとに新しい draft 版を作る
+ * - 最新の版が draft：その版を上書きする
+ * - 最新の版が published / rejected（公開後の編集・差し戻し後の修正）：新しい draft 版を作る。
+ *   公開中の版は承認されるまで表示し続け、差し戻された版はそのまま残す
  * - 審査中（ai_review / admin_review）：審査に出した版は変更しない
  * 版の状態（status）はここでは変えない。状態の遷移は src/server/workflow/ だけで行う。
  */
@@ -81,24 +82,20 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
       // 他人の記事は存在も知らせない
       if (!article || article.author_id !== user.id) return NOT_FOUND;
 
-      const working = await tx.articleVersion.findFirst({
-        where: { articleId, status: { in: [...WORKING_STATUSES] } },
+      const latest = await tx.articleVersion.findFirst({
+        where: { articleId },
+        orderBy: { versionNo: "desc" },
         select: { id: true, status: true, versionNo: true, updatedAt: true },
       });
 
-      if (working && working.status !== "draft") {
-        const submitted = (SUBMITTED_STATUSES as readonly string[]).includes(working.status);
-        return {
-          ok: false,
-          code: "locked",
-          message: submitted ? "審査中の記事は編集できません" : "この記事は現在編集できません",
-        };
+      if (latest && (SUBMITTED_STATUSES as readonly string[]).includes(latest.status)) {
+        return { ok: false, code: "locked", message: "審査中の記事は編集できません" };
       }
 
-      if (working) {
-        if (expectedUpdatedAt && working.updatedAt.toISOString() !== expectedUpdatedAt) return CONFLICT;
+      if (latest?.status === "draft") {
+        if (expectedUpdatedAt && latest.updatedAt.toISOString() !== expectedUpdatedAt) return CONFLICT;
         const version = await tx.articleVersion.update({
-          where: { id: working.id },
+          where: { id: latest.id },
           data: { title, bodyMd },
           select: { id: true, versionNo: true, updatedAt: true },
         });
@@ -107,9 +104,9 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
         return { ok: true, articleId, versionId: version.id, versionNo: version.versionNo, updatedAt: version.updatedAt.toISOString() };
       }
 
-      // 作業中の版がない＝公開済みの記事の編集を始めた。公開中の版はそのまま表示し続ける
-      const last = await tx.articleVersion.aggregate({ where: { articleId }, _max: { versionNo: true } });
-      const versionNo = (last._max.versionNo ?? 0) + 1;
+      // 新しい版を作る。差し戻し後の修正なら差し戻された版を、公開後の編集なら公開中の版を比較元にする
+      const versionNo = (latest?.versionNo ?? 0) + 1;
+      const basedOnVersionId = latest?.status === "rejected" ? latest.id : article.published_version_id;
       const version = await tx.articleVersion.create({
         data: {
           articleId,
@@ -117,7 +114,7 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
           title,
           bodyMd,
           createdBy: user.id,
-          basedOnVersionId: article.published_version_id,
+          basedOnVersionId,
         },
         select: { id: true, updatedAt: true },
       });
@@ -128,7 +125,7 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
         action: "version_created",
         articleId,
         versionId: version.id,
-        metadata: { versionNo, basedOnVersionId: article.published_version_id },
+        metadata: { versionNo, basedOnVersionId },
       });
       return { ok: true, articleId, versionId: version.id, versionNo, updatedAt: version.updatedAt.toISOString() };
     });

@@ -5,7 +5,9 @@
 - **記事（articles）と版（article_versions）を分ける**。記事は「公開中の版」と「作業中の版」を
   指すだけで、本文は版に持つ
   - 公開中の版：`articles.published_version_id`
-  - 作業中の版（draft / ai_review / admin_review / rejected）：1 記事につき最大 1 つ（部分ユニークインデックス）
+  - 進行中の版（draft / ai_review / admin_review）：1 記事につき最大 1 つ（部分ユニークインデックス）
+  - 著者に見せる「作業中の版」は最新の版（版番号が最大）。それが draft / ai_review / admin_review /
+    rejected なら作業中とする。rejected は終わりの状態で、修正すると新しい draft 版を作る
   - これにより「公開後に編集 → 審査中も旧版を表示し続ける」が自然に実現できる
 - 審査に出した版は**不変**。rejected の版を著者が修正すると、新しい draft 版を作る
   （差し戻された版の内容が監査用にそのまま残る）
@@ -192,10 +194,10 @@ erDiagram
 | superseded | かつて公開されていたが、新しい版の公開で置き換わった |
 
 ### audit_logs.action
-`version_created` / `submitted` / `prescan_blocked` / `ai_check_completed` / `ai_check_failed` /
+`version_created` / `draft_discarded` / `submitted` / `prescan_blocked` / `ai_check_completed` / `ai_check_failed` /
 `auto_rejected` / `approved` / `rejected` / `article_hidden` / `article_unhidden` /
 `comment_blocked` / `comment_flagged` / `comment_deleted` / `role_changed` / `user_disabled` /
-`award_given`
+`user_enabled` / `award_given`（フェーズごとに Prisma の enum に追加する）
 
 - AI の判定結果（モデル名、プロンプトのバージョン、risk_level、findings）は
   `compliance_checks` に保存し、監査ログの `metadata` にも同じ内容を複製する
@@ -212,7 +214,7 @@ erDiagram
 | articles | `(first_published_at DESC) WHERE published_version_id IS NOT NULL AND hidden_at IS NULL` | 新着一覧 |
 | articles | `(author_id, updated_at DESC)` | マイページ・ユーザーページ |
 | article_versions | `UNIQUE (article_id, version_no)` | 版番号 |
-| article_versions | `UNIQUE (article_id) WHERE status IN ('draft','ai_review','admin_review','rejected')` | 作業中の版は 1 記事 1 つ |
+| article_versions | `UNIQUE (article_id) WHERE status IN ('draft','ai_review','admin_review')` | 進行中の版は 1 記事 1 つ（差し戻された版は含めない） |
 | article_versions | `(submitted_at) WHERE status = 'admin_review'` | レビュー待ち一覧（申請日時順） |
 | article_versions | `GIN (lower(title) gin_bigm_ops)`、`GIN (lower(body_md) gin_bigm_ops)` | 日本語全文検索（公開版を join して絞る）。pg_bigm は LIKE にしか効かないため、英字の大文字・小文字を区別しないよう `lower()` の式インデックスにする |
 | tags | `UNIQUE (name)`、`GIN (name gin_bigm_ops)` | タグ候補の部分一致 |
@@ -241,3 +243,11 @@ CREATE TRIGGER audit_logs_no_update BEFORE UPDATE OR DELETE ON audit_logs
 ```
 
 マイグレーションはオーナーロール、アプリの実行は `app_user` ロールと、接続ユーザーを分ける。
+
+## 版の保護（マイグレーションで作る）
+
+アプリにバグがあっても承認フローを迂回できないよう、`article_versions` にトリガーを付ける。
+
+- 新しい版はかならず `draft` で作る（INSERT 時に確認）
+- 状態は `docs/design/workflow.md` の遷移だけを許す（`draft → published` などの飛び越しは拒否）
+- 審査に出した版（`draft` 以外）は、タイトル・本文・タグを変更できず、削除もできない

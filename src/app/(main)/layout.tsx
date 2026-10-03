@@ -4,12 +4,14 @@ import { requireUser } from "@/server/auth/guards";
 import { NavLinks } from "@/components/layout/nav-links";
 import { UserMenu } from "@/components/layout/user-menu";
 import { buttonClass } from "@/components/ui/button";
+import { countPendingReviews } from "@/server/articles/admin-queries";
 
 // ログイン後の画面の共通レイアウト。各ページでも requireUser / requireAdmin を呼ぶこと
 // （レイアウトはページ遷移のたびに再実行されるとは限らないため）
 export default async function MainLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
   if (!user.department) redirect("/onboarding");
+  const pendingReviews = user.role === "admin" ? await countPendingReviews(user) : 0;
 
   return (
     <>
@@ -35,6 +37,14 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
             />
           </form>
           <div className="ml-auto flex items-center gap-2 sm:ml-0">
+            {user.role === "admin" && (
+              <Link href="/admin/reviews" className={buttonClass("ghost", "sm")}>
+                レビュー
+                {pendingReviews > 0 && (
+                  <span className="rounded-full bg-accent px-1.5 text-xs font-bold text-white">{pendingReviews}</span>
+                )}
+              </Link>
+            )}
             <Link href="/articles/new" className={buttonClass("primary", "sm")}>
               記事を書く
             </Link>

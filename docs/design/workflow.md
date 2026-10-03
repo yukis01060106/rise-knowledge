@@ -60,7 +60,12 @@ stateDiagram-v2
 
 - **member / admin の違いは「管理者として承認できるか」だけ**。記事を書く権限は同じ
 - 上記以外の遷移（例：draft → published、ai_review → published、rejected → admin_review）は
-  すべてステートマシンがエラーにする
+  すべてステートマシンがエラーにする。DB のトリガーでも同じ遷移だけを許す（docs/design/database.md）
+- 実装：`src/server/workflow/`（遷移表は `transitions.ts`）。画面からは `src/server/workflow/actions.ts`
+  の Server Action を呼ぶ
+- 差し戻された版（rejected）は終わりの状態。著者が修正すると新しい draft 版を作り（比較元は差し戻された版）、
+  レビュー画面では「前回差し戻した版からの修正」として差分を表示する
+- フェーズ 3 の AI チェックは仮実装（`runComplianceCheck` が判定なしで admin_review へ進める）
 - 遷移は「現在の状態を条件にした UPDATE」（`WHERE id = ? AND status = ?`）で行い、
   同時に 2 人の管理者が操作しても二重に処理されないようにする
 - AI チェックの結果が返ってきたときに、すでに別の版に置き換わっていたら結果は保存するが

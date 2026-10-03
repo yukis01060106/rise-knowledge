@@ -68,10 +68,13 @@ export default async function MyArticlesPage({ searchParams }: PageProps<"/me/ar
                   {a.hidden && <span className="text-danger">非公開（管理者）</span>}
                   <span>更新 {formatDateTime(a.updatedAt)}</span>
                 </p>
+                {a.working?.status === "rejected" && a.working.rejectReason && (
+                  <p className="mt-1 line-clamp-2 text-xs text-danger">差し戻しの理由：{a.working.rejectReason}</p>
+                )}
               </div>
-              {(!a.working || a.working.status === "draft") && (
+              {(!a.working || a.working.status === "draft" || a.working.status === "rejected") && (
                 <Link href={`/articles/${a.id}/edit`} className={buttonClass("secondary", "sm")}>
-                  編集
+                  {a.working?.status === "rejected" ? "修正する" : "編集"}
                 </Link>
               )}
             </li>

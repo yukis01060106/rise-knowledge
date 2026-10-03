@@ -38,6 +38,15 @@ enum VersionStatus {
 // 監査ログの操作種別。フェーズが進むごとに追加する（docs/design/database.md）
 enum AuditAction {
   version_created
+  draft_discarded
+  submitted
+  ai_check_completed
+  ai_check_failed
+  auto_rejected
+  approved
+  rejected
+  article_hidden
+  article_unhidden
   role_changed
   user_disabled
   user_enabled

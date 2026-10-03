@@ -26,8 +26,8 @@ export function UserMenu({ name, email, department, role }: Props) {
           自分の記事
         </Link>
         {role === "admin" && (
-          <Link href="/admin/users" className={item}>
-            ユーザー管理
+          <Link href="/admin/reviews" className={item}>
+            管理画面
           </Link>
         )}
         <form action={logoutAction} className="border-t border-border pt-1">
